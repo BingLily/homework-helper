@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>毅弘远的作业帮</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #4CAF50; --primary-dark: #388E3C; --accent: #FF9800;
+      --bg: #f0f7f0; --card-bg: rgba(255,255,255,0.92);
+      --text: #333; --text-light: #666; --border: #e0e0e0;
+      --chinese: #e74c3c; --math: #3498db; --english: #9b59b6;
+      --exercise: #e67e22; --interest: #e91e63;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text); min-height: 100vh; background: var(--bg);
+      background-image: radial-gradient(circle at 15% 85%, rgba(76,175,80,0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 85% 15%, rgba(255,152,0,0.08) 0%, transparent 50%);
+      position: relative; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; top: -60px; right: -60px; width: 200px; height: 200px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='none' stroke='%234CAF50' stroke-width='2' opacity='0.15'/%3E%3Cpolygon points='50,10 61,30 50,25 39,30' fill='%234CAF50' opacity='0.1'/%3E%3Cpolygon points='50,90 39,70 50,75 61,70' fill='%234CAF50' opacity='0.1'/%3E%3Cpolygon points='10,50 30,39 25,50 30,61' fill='%234CAF50' opacity='0.1'/%3E%3Cpolygon points='90,50 70,61 75,50 70,39' fill='%234CAF50' opacity='0.1'/%3E%3Ccircle cx='50' cy='50' r='12' fill='none' stroke='%234CAF50' stroke-width='1.5' opacity='0.12'/%3E%3C/svg%3E");
+      background-size: contain; background-repeat: no-repeat; z-index: 0; pointer-events: none;
+    }
+    body::after {
+      content: ''; position: fixed; bottom: -40px; left: -40px; width: 160px; height: 160px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='none' stroke='%23FF9800' stroke-width='2' opacity='0.12'/%3E%3Ccircle cx='50' cy='50' r='12' fill='none' stroke='%23FF9800' stroke-width='1.5' opacity='0.1'/%3E%3Cpath d='M50 5 L50 20 M50 80 L50 95 M5 50 L20 50 M80 50 L95 50' stroke='%23FF9800' stroke-width='1' opacity='0.1'/%3E%3C/svg%3E");
+      background-size: contain; background-repeat: no-repeat; z-index: 0; pointer-events: none;
+    }
+    #app { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; z-index: 1; }
+    .page { padding: 16px; padding-bottom: 80px; min-height: 100vh; }
+    .page-title { font-size: 22px; font-weight: 700; margin-bottom: 16px; color: var(--primary-dark); }
+    .card { background: var(--card-bg); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s; gap: 8px; }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-accent { background: var(--accent); color: white; }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+    .btn-block { width: 100%; }
+    .subject-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; color: white; }
+    .subject-chinese { background: var(--chinese); }
+    .subject-math { background: var(--math); }
+    .subject-english { background: var(--english); }
+    .subject-exercise { background: var(--exercise); }
+    .subject-interest { background: var(--interest); }
+    input, textarea, select { width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 80px; }
+    .nav-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; padding: 8px 0; border-top: 1px solid var(--border); z-index: 100; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px; text-decoration: none; color: var(--text-light); font-size: 11px; font-weight: 500; cursor: pointer; border-radius: 8px; border: none; background: none; transition: color 0.2s; }
+    .nav-item.active { color: var(--primary); }
+    .nav-item .nav-icon { font-size: 22px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 14px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+    .empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+    .user-avatar { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; font-weight: 700; flex-shrink: 0; }
+
+    /* Home */
+    .home-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding-bottom: 20px; }
+    .home-header { text-align: center; margin-bottom: 32px; }
+    .football-icon { font-size: 64px; margin-bottom: 12px; }
+    .home-title { font-size: 28px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; }
+    .home-subtitle { color: var(--text-light); font-size: 15px; }
+    .select-hint { font-size: 16px; color: var(--text-light); margin-bottom: 16px; text-align: center; }
+    .user-cards { display: flex; gap: 16px; justify-content: center; }
+    .user-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 32px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .user-card:active { transform: scale(0.95); }
+    .user-name { font-size: 18px; font-weight: 700; }
+    .welcome { width: 100%; padding: 0 16px; }
+    .welcome-card { padding: 24px; }
+    .welcome-info { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .welcome-name { font-size: 20px; font-weight: 700; color: var(--primary-dark); }
+    .welcome-text { color: var(--text-light); font-size: 14px; margin-top: 4px; }
+    .switch-user { margin-top: 16px; width: 100%; }
+
+    /* Homework List */
+    .subject-filters { display: flex; gap: 8px; margin-top: 12px; }
+    .filter-btn { padding: 6px 16px; border: 2px solid var(--border); border-radius: 20px; background: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text-light); }
+    .filter-btn.active { color: white; border-color: transparent; }
+    .filter-btn.active.filter-all { background: var(--primary); }
+    .filter-btn.active.filter-chinese { background: var(--chinese); }
+    .filter-btn.active.filter-math { background: var(--math); }
+    .filter-btn.active.filter-english { background: var(--english); }
+    .filter-btn.active.filter-exercise { background: var(--exercise); }
+    .filter-btn.active.filter-interest { background: var(--interest); }
+    .hw-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .hw-header-right { display: flex; align-items: center; gap: 6px; }
+    .checkin-badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px; white-space: nowrap; }
+    .checkin-badge.done { background: #e8f5e9; color: #2e7d32; }
+    .checkin-badge.pending { background: #fff3e0; color: #e65100; }
+    .delete-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; opacity: 0.6; }
+    .delete-btn:active { opacity: 1; }
+    .hw-content { font-size: 15px; line-height: 1.6; margin-bottom: 8px; white-space: pre-wrap; }
+    .hw-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .attachment-tag { background: #f5f5f5; padding: 4px 10px; border-radius: 8px; font-size: 13px; color: var(--text-light); }
+    .hw-time { font-size: 12px; color: #aaa; }
+    .date-header { font-size: 14px; font-weight: 700; color: var(--primary-dark); margin: 16px 0 8px; padding-left: 4px; display: flex; align-items: center; gap: 6px; }
+    .date-header::before { content: ''; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
+    .date-quick-select { display: flex; gap: 8px; align-items: center; }
+    .date-btn { padding: 8px 18px; border: 2px solid var(--border); border-radius: 10px; background: white; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text-light); transition: all 0.2s; }
+    .date-btn.active { background: var(--primary); color: white; border-color: transparent; }
+    .date-input-wrap { flex: 1; }
+    .date-input { padding: 8px 10px; font-size: 14px; border: 2px solid var(--border); border-radius: 10px; width: 100%; }
+
+    /* Add */
+    .subject-select { display: flex; flex-wrap: wrap; gap: 10px; }
+    .subject-btn { flex: 1 1 calc(33.33% - 8px); min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border: 2px solid var(--border); border-radius: 12px; background: white; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 600; color: var(--text-light); }
+    .subject-btn.active { color: white; border-color: transparent; transform: scale(1.05); }
+    .subject-btn.active.sel-chinese { background: var(--chinese); }
+    .subject-btn.active.sel-math { background: var(--math); }
+    .subject-btn.active.sel-english { background: var(--english); }
+    .subject-btn.active.sel-exercise { background: var(--exercise); }
+    .subject-btn.active.sel-interest { background: var(--interest); }
+    .subject-emoji { font-size: 24px; }
+    .upload-btn { display: inline-flex; align-items: center; padding: 10px 16px; background: #f5f5f5; border-radius: 10px; cursor: pointer; font-size: 14px; color: var(--text-light); }
+    .upload-btn input { display: none; }
+    .file-list { margin-top: 8px; }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 4px; font-size: 13px; }
+    .remove-file { background: none; border: none; font-size: 18px; color: #e74c3c; cursor: pointer; padding: 0 4px; }
+
+    /* Checkin */
+    .timer-section { text-align: center; padding: 20px 0; }
+    .timer-display { margin-bottom: 24px; }
+    .timer-label { display: block; font-size: 14px; color: var(--text-light); margin-bottom: 8px; }
+    .timer-value { font-size: 48px; font-weight: 800; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
+    .timer-actions { display: flex; flex-direction: column; gap: 8px; }
+    .section-title { font-size: 18px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; }
+    .checkin-record { padding: 12px 16px; }
+    .record-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .record-status { font-size: 13px; color: var(--primary); font-weight: 600; }
+    .record-detail { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-light); }
+
+    /* History */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 16px; }
+    .stat-card { flex: 1; text-align: center; padding: 20px 12px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--primary-dark); }
+    .stat-label { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+    .subject-stats { margin-bottom: 24px; }
+    .stat-item { padding: 12px 16px; }
+    .stat-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .stat-count { font-size: 14px; font-weight: 600; color: var(--text-light); }
+    .stat-bar { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+    .stat-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .stat-bar-fill.bar-chinese { background: var(--chinese); }
+    .stat-bar-fill.bar-math { background: var(--math); }
+    .stat-bar-fill.bar-english { background: var(--english); }
+    .stat-bar-fill.bar-exercise { background: var(--exercise); }
+    .stat-bar-fill.bar-interest { background: var(--interest); }
+    .history-card { padding: 12px 16px; }
+    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .history-date { font-size: 13px; color: #aaa; }
+    .history-detail { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-light); }
+
+    /* User Switch Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; }
+    .modal-content { background: white; border-radius: 20px; padding: 28px 24px; width: 85%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+    .modal-title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 20px; color: var(--primary-dark); }
+    .modal-users { display: flex; gap: 16px; justify-content: center; }
+    .modal-user-card { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 24px; border-radius: 16px; cursor: pointer; transition: all 0.2s; border: 2px solid var(--border); background: white; }
+    .modal-user-card:active { transform: scale(0.95); }
+    .modal-user-card.current { border-color: var(--primary); background: #f0faf0; }
+    .modal-user-name { font-size: 16px; font-weight: 700; }
+    .modal-user-badge { font-size: 11px; color: var(--primary); font-weight: 600; }
+    .modal-close { display: block; margin: 20px auto 0; padding: 10px 32px; border: none; background: #f5f5f5; border-radius: 10px; font-size: 14px; cursor: pointer; color: var(--text-light); }
+
+    /* Image Preview */
+    .image-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .preview-item { position: relative; width: 80px; height: 80px; border-radius: 10px; overflow: hidden; border: 2px solid var(--border); }
+    .preview-img { width: 100%; height: 100%; object-fit: cover; }
+    .remove-preview { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: white; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+    /* Record Attachments */
+    .record-attachments { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .record-img-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .record-img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; }
+    .record-file-list { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    /* Settings Page */
+    .settings-card { padding: 20px; }
+    .settings-section { margin-bottom: 24px; }
+    .settings-section-title { font-size: 16px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .config-field { margin-bottom: 12px; }
+    .config-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 4px; }
+    .config-field input { font-size: 13px; padding: 10px; }
+    .status-indicator { display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+    .status-connected { background: #e8f5e9; color: #2e7d32; }
+    .status-disconnected { background: #fff3e0; color: #e65100; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .status-connected .status-dot { background: #4CAF50; }
+    .status-disconnected .status-dot { background: #FF9800; }
+    .sync-info { font-size: 12px; color: var(--text-light); margin-top: 8px; }
+    .btn-settings { margin-top: 16px; }
+
+    /* Checkin HW Select */
+    .hw-select-list { display: flex; flex-direction: column; gap: 6px; }
+    .hw-select-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #f9f9f9; border-radius: 10px; cursor: pointer; font-size: 14px; line-height: 1.5; }
+    .hw-select-item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex-shrink: 0; }
+    .hw-select-text { flex: 1; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- HOME PAGE -->
+    <div v-if="currentPage === 'home'" class="page home-page">
+      <div class="home-header">
+        <div class="football-icon">⚽</div>
+        <h1 class="home-title">毅弘远的作业帮</h1>
+        <p class="home-subtitle">加油！每天进步一点点</p>
+      </div>
+      <div v-if="!currentUser" class="user-select">
+        <p class="select-hint">请选择你是谁：</p>
+        <div class="user-cards">
+          <div class="card user-card" v-for="u in users" :key="u" @click="selectUser(u)">
+            <div class="user-avatar" :style="{ background: u === '涂毅弘' ? '#4CAF50' : '#FF9800' }">{{ u.slice(-1) }}</div>
+            <div class="user-name">{{ u }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="welcome">
+        <div class="card welcome-card">
+          <div class="welcome-info">
+            <div class="user-avatar" :style="{ background: currentUser === '涂毅弘' ? '#4CAF50' : '#FF9800' }">{{ currentUser.slice(-1) }}</div>
+            <div>
+              <h2 class="welcome-name">{{ currentUser }}，你好！</h2>
+              <p class="welcome-text">今天也要加油哦 ⚽</p>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" @click="go('homework')">查看作业 →</button>
+        </div>
+        <button class="btn btn-outline switch-user" @click="switchUser">切换用户</button>
+      </div>
+    </div>
+
+    <!-- HOMEWORK LIST PAGE -->
+    <div v-if="currentPage === 'homework'" class="page">
+      <h1 class="page-title">{{ currentUser }} 的作业</h1>
+      <div class="subject-filters">
+        <button v-for="s in allSubjects" :key="s.key" class="filter-btn" :class="{ active: filter === s.key, ['filter-' + s.key]: true }" @click="filter = s.key">{{ s.label }}</button>
+      </div>
+      <div v-if="homeworkByDate.length === 0" class="empty-state">
+        <div class="emoji">📝</div>
+        <p>最近3天暂无作业，点击下方添加吧！</p>
+      </div>
+      <div v-else>
+        <div v-for="group in homeworkByDate" :key="group.label">
+          <div class="date-header">{{ group.label }}</div>
+          <div class="card" v-for="hw in group.items" :key="hw.id">
+            <div class="hw-header">
+              <span class="subject-tag" :class="'subject-' + hw.subject">{{ subjectLabel(hw.subject) }}</span>
+              <div class="hw-header-right">
+                <span v-if="getHomeworkCheckin(hw)" class="checkin-badge done">✅ {{ getHomeworkCheckin(hw).startTime }}-{{ getHomeworkCheckin(hw).endTime }} {{ formatDuration(getHomeworkCheckin(hw).duration) }}</span>
+                <span v-else class="checkin-badge pending">⏳ 未打卡</span>
+                <button class="delete-btn" @click="deleteHomework(hw.id)">🗑️</button>
+              </div>
+            </div>
+            <p class="hw-content">{{ hw.content }}</p>
+            <div class="hw-attachments" v-if="hw.attachments && hw.attachments.length">
+              <span class="attachment-tag" v-for="(f, i) in hw.attachments" :key="i">📎 {{ f }}</span>
+            </div>
+            <div class="hw-time">{{ formatTime(hw.createdAt) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADD HOMEWORK PAGE -->
+    <div v-if="currentPage === 'add'" class="page">
+      <h1 class="page-title">添加作业</h1>
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">选择科目</label>
+          <div class="subject-select">
+            <button v-for="s in subjects" :key="s.key" class="subject-btn" :class="{ active: addForm.subject === s.key, ['sel-' + s.key]: true }" @click="addForm.subject = s.key">
+              <span class="subject-emoji">{{ s.emoji }}</span>
+              <span>{{ s.label }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">作业日期</label>
+          <div class="date-quick-select">
+            <button class="date-btn" :class="{ active: addForm.date === todayStr }" @click="addForm.date = todayStr">今天</button>
+            <button class="date-btn" :class="{ active: addForm.date === yesterdayStr }" @click="addForm.date = yesterdayStr">昨天</button>
+            <label class="date-input-wrap">
+              <input type="date" v-model="addForm.date" class="date-input" />
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">作业内容</label>
+          <textarea v-model="addForm.content" placeholder="输入作业内容..." rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">添加附件</label>
+          <label class="upload-btn">
+            <span>📎 选择文件</span>
+            <input type="file" multiple @change="handleFiles" />
+          </label>
+          <div class="file-list" v-if="addForm.attachments.length">
+            <div class="file-item" v-for="(f, i) in addForm.attachments" :key="i">
+              <span>📄 {{ f }}</span>
+              <button @click="addForm.attachments.splice(i, 1)" class="remove-file">×</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" @click="addHomework" :disabled="!addForm.content.trim()">添加作业 ⚽</button>
+      </div>
+    </div>
+
+    <!-- CHECKIN PAGE -->
+    <div v-if="currentPage === 'checkin'" class="page">
+      <h1 class="page-title">今日打卡</h1>
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">选择科目</label>
+          <div class="subject-select">
+            <button v-for="s in subjects" :key="s.key" class="subject-btn" :class="{ active: checkinSubject === s.key, ['sel-' + s.key]: true }" @click="checkinSubject = s.key; checkinHomeworkIds = []">
+              <span class="subject-emoji">{{ s.emoji }}</span>
+              <span>{{ s.label }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-group" v-if="todaySubjectHomework.length > 0">
+          <label class="form-label">选择要完成的作业</label>
+          <div class="hw-select-list">
+            <label class="hw-select-item" v-for="hw in todaySubjectHomework" :key="hw.id">
+              <input type="checkbox" :checked="checkinHomeworkIds.includes(hw.id)" @change="toggleHomeworkId(hw.id, $event)" />
+              <span class="hw-select-text">{{ hw.content }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group" v-else-if="checkinSubject">
+          <div style="font-size:13px; color: var(--text-light); padding: 8px 0;">今日该科目暂无作业，可直接打卡</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">上传作业照片/附件</label>
+          <label class="upload-btn">
+            <span> 选择文件（支持图片和文件）</span>
+            <input type="file" multiple accept="image/*,.pdf,.doc,.docx" @change="handleCheckinFiles" />
+          </label>
+          <div class="file-list" v-if="checkinAttachments.length">
+            <div class="file-item" v-for="(f, i) in checkinAttachments" :key="i">
+              <span>📄 {{ f.name }}</span>
+              <button @click="checkinAttachments.splice(i, 1)" class="remove-file">×</button>
+            </div>
+          </div>
+          <div class="image-preview" v-if="checkinImagePreviews.length">
+            <div class="preview-item" v-for="(img, i) in checkinImagePreviews" :key="i">
+              <img :src="img" class="preview-img" />
+              <button class="remove-preview" @click="removeCheckinImage(i)">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="timer-section">
+          <div class="timer-display">
+            <span class="timer-label">已用时</span>
+            <span class="timer-value">{{ formatDuration(timerElapsed) }}</span>
+          </div>
+          <div class="timer-actions">
+            <button v-if="!timerRunning && !timerStarted" class="btn btn-primary btn-block" @click="startTimer">▶ 开始写作业</button>
+            <button v-if="timerRunning" class="btn btn-accent btn-block" @click="pauseTimer">⏸ 暂停</button>
+            <button v-if="timerStarted && !timerRunning" class="btn btn-primary btn-block" @click="resumeTimer">▶ 继续</button>
+            <button v-if="timerStarted" class="btn btn-primary btn-block" @click="finishCheckin" style="margin-top:8px">✅ 完成打卡</button>
+          </div>
+        </div>
+      </div>
+      <div v-if="todayCheckins.length > 0" class="today-records">
+        <h2 class="section-title">今日已完成</h2>
+        <div class="card checkin-record" v-for="r in todayCheckins" :key="r.id">
+          <div class="record-header">
+            <span class="subject-tag" :class="'subject-' + r.subject">{{ subjectLabel(r.subject) }}</span>
+            <span class="record-status">✅ 已完成</span>
+          </div>
+          <div class="record-detail">
+            <span>⏱ 用时 {{ formatDuration(r.duration) }}</span>
+            <span>{{ r.startTime }} - {{ r.endTime }}</span>
+          </div>
+          <div v-if="r.homeworkIds && r.homeworkIds.length" style="margin-top:8px; font-size:13px; color: var(--text-light);">
+            <div v-for="hid in r.homeworkIds" :key="hid" style="padding: 2px 0;">📋 {{ getHomeworkContent(hid) }}</div>
+          </div>
+          <div class="record-attachments" v-if="r.attachments && r.attachments.length">
+            <div class="record-img-list" v-if="r.images && r.images.length">
+              <img v-for="(img, i) in r.images" :key="'img'+i" :src="img" class="record-img" />
+            </div>
+            <div class="record-file-list">
+              <span class="attachment-tag" v-for="(f, i) in r.attachments" :key="'f'+i">📎 {{ f }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div v-if="currentPage === 'history'" class="page">
+      <h1 class="page-title">历史记录</h1>
+      <div class="stats-row">
+        <div class="card stat-card">
+          <div class="stat-value">{{ totalDays }}</div>
+          <div class="stat-label">打卡天数</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value">{{ totalTimeStr }}</div>
+          <div class="stat-label">总用时</div>
+        </div>
+      </div>
+      <div class="subject-stats">
+        <div class="card stat-item" v-for="s in subjectStats" :key="s.key">
+          <div class="stat-item-header">
+            <span class="subject-tag" :class="'subject-' + s.key">{{ s.label }}</span>
+            <span class="stat-count">{{ s.count }} 次</span>
+          </div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill" :class="'bar-' + s.key" :style="{ width: s.percent + '%' }"></div>
+          </div>
+        </div>
+      </div>
+      <h2 class="section-title">打卡详情</h2>
+      <div v-if="history.length === 0" class="empty-state">
+        <div class="emoji">📊</div>
+        <p>还没有打卡记录哦</p>
+      </div>
+      <div v-else>
+        <div class="card history-card" v-for="r in history" :key="r.id">
+          <div class="history-header">
+            <span class="subject-tag" :class="'subject-' + r.subject">{{ subjectLabel(r.subject) }}</span>
+            <span class="history-date">{{ r.date }}</span>
+          </div>
+          <div class="history-detail">
+            <span>⏱ {{ formatDuration(r.duration) }}</span>
+            <span>{{ r.startTime }} - {{ r.endTime }}</span>
+          </div>
+          <div class="record-attachments" v-if="r.attachments && r.attachments.length">
+            <div class="record-img-list" v-if="r.images && r.images.length">
+              <img v-for="(img, i) in r.images" :key="'himg'+i" :src="img" class="record-img" />
+            </div>
+            <div class="record-file-list">
+              <span class="attachment-tag" v-for="(f, i) in r.attachments" :key="'hf'+i">📎 {{ f.name || f }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div v-if="currentPage === 'settings'" class="page">
+      <h1 class="page-title">设置</h1>
+
+      <div class="card settings-card">
+        <div class="settings-section">
+          <div class="settings-section-title">☁️ 云存储状态</div>
+          <div class="status-indicator" :class="sbConnected ? 'status-connected' : 'status-disconnected'">
+            <div class="status-dot"></div>
+            <span>{{ sbConnected ? '已连接云端' : '未连接云端' }}</span>
+          </div>
+          <div class="sync-info" v-if="sbConnected">
+            数据已同步到 Supabase，支持多设备访问
+          </div>
+          <div class="sync-info" v-else>
+            请配置 Supabase 以启用云存储和多设备同步
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">⚙️ Supabase 配置</div>
+          <div class="config-field">
+            <label>Project URL</label>
+            <input v-model="sbConfig.supabaseUrl" placeholder="https://xxx.supabase.co" />
+          </div>
+          <div class="config-field">
+            <label>Anon Key</label>
+            <input v-model="sbConfig.supabaseAnonKey" placeholder="请输入 anon public key" />
+          </div>
+          <button class="btn btn-primary btn-block btn-settings" @click="saveSbConfig">
+            保存配置
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">📖 如何获取配置</div>
+          <div style="font-size: 13px; color: var(--text-light); line-height: 1.8;">
+            1. 访问 <strong>supabase.com</strong> 注册并创建项目（免费）<br>
+            2. 在项目 Settings → API 中复制 Project URL 和 anon public key<br>
+            3. 在 SQL Editor 中执行建表语句（见下方）<br>
+            4. 在 Settings → Database 中开启 Realtime（homework 和 checkin 表）<br><br>
+            <strong>建表 SQL：</strong><br>
+            <code style="font-size:11px; background:#f5f5f5; padding:8px; border-radius:6px; display:block; white-space:pre; overflow-x:auto;">CREATE TABLE homework (
+  id bigserial primary key,
+  "user" text not null,
+  subject text not null,
+  content text not null,
+  attachments jsonb default '[]',
+  created_at timestamptz default now()
+);
+CREATE TABLE checkin (
+  id bigserial primary key,
+  "user" text not null,
+  subject text not null,
+  duration int default 0,
+  start_time text,
+  end_time text,
+  date text,
+  attachments jsonb default '[]',
+  images jsonb default '[]',
+  homework_ids jsonb default '[]',
+  created_at timestamptz default now()
+);
+ALTER TABLE homework ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checkin ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "open" ON homework FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">👤 用户管理</div>
+          <button class="btn btn-outline btn-block" @click="showSwitchModal = true">
+            切换用户
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NAV BAR -->
+    <nav class="nav-bar" v-if="currentUser">
+      <button class="nav-item" :class="{ active: currentPage === 'homework' }" @click="go('homework')">
+        <span class="nav-icon">📚</span><span>作业</span>
+      </button>
+      <button class="nav-item" :class="{ active: currentPage === 'add' }" @click="go('add')">
+        <span class="nav-icon">➕</span><span>添加</span>
+      </button>
+      <button class="nav-item" :class="{ active: currentPage === 'checkin' }" @click="go('checkin')">
+        <span class="nav-icon">✅</span><span>打卡</span>
+      </button>
+      <button class="nav-item" :class="{ active: currentPage === 'history' }" @click="go('history')">
+        <span class="nav-icon">📊</span><span>记录</span>
+      </button>
+      <button class="nav-item" :class="{ active: currentPage === 'settings' }" @click="go('settings')">
+        <span class="nav-icon">⚙️</span><span>设置</span>
+      </button>
+    </nav>
+
+    <!-- USER SWITCH MODAL -->
+    <div class="modal-overlay" v-if="showSwitchModal" @click.self="showSwitchModal = false">
+      <div class="modal-content">
+        <div class="modal-title">切换用户</div>
+        <div class="modal-users">
+          <div class="modal-user-card" :class="{ current: currentUser === u }" v-for="u in users" :key="u" @click="selectUser(u)">
+            <div class="user-avatar" :style="{ background: u === '涂毅弘' ? '#4CAF50' : '#FF9800', width: '52px', height: '52px', fontSize: '22px' }">{{ u.slice(-1) }}</div>
+            <div class="modal-user-name">{{ u }}</div>
+            <div class="modal-user-badge" v-if="currentUser === u">当前用户</div>
+          </div>
+        </div>
+        <button class="modal-close" @click="showSwitchModal = false">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, reactive, computed, onUnmounted, watch } = Vue;
+
+    // Supabase Service
+    const SupabaseService = {
+      client: null,
+      connected: false,
+      channels: [],
+
+      init(config) {
+        if (!config || !config.supabaseUrl || !config.supabaseAnonKey) return false;
+        try {
+          let url = config.supabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+          this.client = supabase.createClient(url, config.supabaseAnonKey);
+          this.connected = true;
+          return true;
+        } catch (e) {
+          console.error('Supabase init error:', e);
+          this.connected = false;
+          return false;
+        }
+      },
+
+      async addHomework(data) {
+        if (!this.connected) return null;
+        try {
+          const { data: res, error } = await this.client
+            .from('homework')
+            .insert({
+              user: data.user,
+              subject: data.subject,
+              content: data.content,
+              attachments: data.attachments || [],
+              created_at: data.createdAt || new Date().toISOString()
+            })
+            .select()
+            .single();
+          if (error) { console.error('Add homework error:', error); return null; }
+          return res.id;
+        } catch (e) {
+          console.error('Add homework error:', e);
+          return null;
+        }
+      },
+
+      async deleteHomework(id) {
+        if (!this.connected) return;
+        try {
+          await this.client.from('homework').delete().eq('id', id);
+        } catch (e) {
+          console.error('Delete homework error:', e);
+        }
+      },
+
+      async addCheckin(data) {
+        if (!this.connected) return null;
+        try {
+          const { data: res, error } = await this.client
+            .from('checkin')
+            .insert({
+              user: data.user,
+              subject: data.subject,
+              duration: data.duration,
+              start_time: data.startTime,
+              end_time: data.endTime,
+              date: data.date,
+              attachments: data.attachments || [],
+              images: data.images || [],
+              homework_ids: data.homeworkIds || [],
+              created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+          if (error) { console.error('Add checkin error:', error); return null; }
+          return res.id;
+        } catch (e) {
+          console.error('Add checkin error:', e);
+          return null;
+        }
+      },
+
+      async fetchHomework(callback) {
+        if (!this.connected) return;
+        try {
+          const { data, error } = await this.client
+            .from('homework')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (error) { console.error('Fetch homework error:', error); return; }
+          const mapped = (data || []).map(row => ({
+            id: row.id,
+            user: row.user,
+            subject: row.subject,
+            content: row.content,
+            attachments: row.attachments || [],
+            createdAt: row.created_at
+          }));
+          callback(mapped);
+        } catch (e) {
+          console.error('Fetch homework error:', e);
+        }
+      },
+
+      async fetchCheckins(callback) {
+        if (!this.connected) return;
+        try {
+          const { data, error } = await this.client
+            .from('checkin')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (error) { console.error('Fetch checkins error:', error); return; }
+          const mapped = (data || []).map(row => ({
+            id: row.id,
+            user: row.user,
+            subject: row.subject,
+            duration: row.duration,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            date: row.date,
+            attachments: row.attachments || [],
+            images: row.images || [],
+            homeworkIds: row.homework_ids || [],
+            createdAt: row.created_at
+          }));
+          callback(mapped);
+        } catch (e) {
+          console.error('Fetch checkins error:', e);
+        }
+      },
+
+      listenHomework(callback) {
+        if (!this.connected) return;
+        this.fetchHomework(callback);
+        const channel = this.client
+          .channel('homework-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => {
+            this.fetchHomework(callback);
+          })
+          .subscribe();
+        this.channels.push(channel);
+      },
+
+      listenCheckins(callback) {
+        if (!this.connected) return;
+        this.fetchCheckins(callback);
+        const channel = this.client
+          .channel('checkin-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'checkin' }, () => {
+            this.fetchCheckins(callback);
+          })
+          .subscribe();
+        this.channels.push(channel);
+      },
+
+      cleanup() {
+        this.channels.forEach(ch => {
+          try { this.client.removeChannel(ch); } catch (e) {}
+        });
+        this.channels = [];
+      }
+    };
+
+    // Load saved Supabase config
+    const savedSbConfig = JSON.parse(localStorage.getItem('sbConfig') || 'null');
+    if (savedSbConfig) {
+      SupabaseService.init(savedSbConfig);
+    }
+
+    createApp({
+      setup() {
+        const users = ['涂毅弘', '涂毅远'];
+        const currentUser = ref(localStorage.getItem('currentUser') || '');
+        const currentPage = ref(currentUser.value ? 'homework' : 'home');
+        const filter = ref('all');
+        const checkinSubject = ref('chinese');
+        const showSwitchModal = ref(false);
+        const checkinAttachments = reactive([]);
+        const checkinImagePreviews = reactive([]);
+        const checkinImages = reactive([]);
+
+        const sbConfig = reactive(savedSbConfig || { supabaseUrl: '', supabaseAnonKey: '' });
+        const sbConnected = ref(SupabaseService.connected);
+
+        function setupRealtimeListeners() {
+          SupabaseService.cleanup();
+          SupabaseService.listenHomework(data => {
+            homeworkList.splice(0, homeworkList.length, ...data);
+          });
+          SupabaseService.listenCheckins(data => {
+            checkinRecords.splice(0, checkinRecords.length, ...data);
+          });
+        }
+
+        async function saveSbConfig() {
+          let url = sbConfig.supabaseUrl.trim();
+          url = url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+          const config = {
+            supabaseUrl: url,
+            supabaseAnonKey: sbConfig.supabaseAnonKey.trim()
+          };
+          if (!config.supabaseUrl || !config.supabaseAnonKey) {
+            alert('请填写 Supabase URL 和 Anon Key');
+            return;
+          }
+          SupabaseService.cleanup();
+          const success = SupabaseService.init(config);
+          if (success) {
+            localStorage.setItem('sbConfig', JSON.stringify(config));
+            sbConnected.value = true;
+            setupRealtimeListeners();
+            alert('Supabase 配置已保存，云存储已启用！');
+          } else {
+            sbConnected.value = false;
+            alert('初始化失败，请检查配置');
+          }
+        }
+
+        if (SupabaseService.connected) {
+          setupRealtimeListeners();
+        }
+
+        const subjects = [
+          { key: 'chinese', label: '语文', emoji: '📖' },
+          { key: 'math', label: '数学', emoji: '🔢' },
+          { key: 'english', label: '英语', emoji: '🔤' },
+          { key: 'exercise', label: '体育', emoji: '⚽' },
+          { key: 'interest', label: '兴趣', emoji: '🎨' }
+        ];
+        const allSubjects = [{ key: 'all', label: '全部' }, ...subjects];
+
+        const homeworkList = reactive([]);
+        const checkinRecords = reactive([]);
+
+        function selectUser(name) {
+          currentUser.value = name;
+          localStorage.setItem('currentUser', name);
+          currentPage.value = 'homework';
+          showSwitchModal.value = false;
+        }
+
+        function switchUser() {
+          currentUser.value = '';
+          localStorage.removeItem('currentUser');
+          currentPage.value = 'home';
+        }
+
+        function go(page) {
+          currentPage.value = page;
+        }
+
+        function subjectLabel(key) {
+          const map = { chinese: '语文', math: '数学', english: '英语', exercise: '体育', interest: '兴趣' };
+          return map[key] || key;
+        }
+
+        function formatTime(iso) {
+          const d = new Date(iso);
+          return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function formatDuration(sec) {
+          const h = Math.floor(sec / 3600);
+          const m = Math.floor((sec % 3600) / 60);
+          const s = sec % 60;
+          if (h > 0) return `${h}时${m}分${s}秒`;
+          if (m > 0) return `${m}分${s}秒`;
+          return `${s}秒`;
+        }
+
+        function getHomeworkCheckin(hw) {
+          const hwDate = new Date(hw.createdAt);
+          const hwDay = `${hwDate.getFullYear()}-${String(hwDate.getMonth()+1).padStart(2,'0')}-${String(hwDate.getDate()).padStart(2,'0')}`;
+          const dayMatches = checkinRecords.filter(r =>
+            r.user === hw.user && r.subject === hw.subject && r.date === hwDay
+          );
+          if (dayMatches.length === 0) return null;
+          const hwMatch = dayMatches.find(r => r.homeworkIds && r.homeworkIds.includes(hw.id));
+          let target = hwMatch;
+          if (!target) {
+            const unlinked = dayMatches.filter(r => !r.homeworkIds || r.homeworkIds.length === 0);
+            if (unlinked.length > 0) target = unlinked[0];
+          }
+          if (!target) return null;
+          return { count: dayMatches.length, duration: target.duration || 0, startTime: target.startTime || '', endTime: target.endTime || '' };
+        }
+
+        function getHomeworkContent(id) {
+          const hw = homeworkList.find(h => h.id === id);
+          return hw ? hw.content : '作业已删除';
+        }
+
+        // Homework
+        const userHomework = computed(() => homeworkList.filter(h => h.user === currentUser.value));
+        const filteredHomework = computed(() => {
+          const now = new Date();
+          const threeDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+          threeDaysAgo.setHours(0, 0, 0, 0);
+          let list = userHomework.value.filter(h => {
+            const d = new Date(h.createdAt);
+            return d >= threeDaysAgo;
+          });
+          if (filter.value !== 'all') {
+            list = list.filter(h => h.subject === filter.value);
+          }
+          return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        });
+        const homeworkByDate = computed(() => {
+          const groups = {};
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          filteredHomework.value.forEach(hw => {
+            const d = new Date(hw.createdAt);
+            const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            if (!groups[dayKey]) groups[dayKey] = [];
+            groups[dayKey].push(hw);
+          });
+          return Object.keys(groups).sort((a, b) => b - a).map(key => {
+            const ts = Number(key);
+            const diff = Math.round((today.getTime() - ts) / 86400000);
+            let label;
+            if (diff === 0) label = '今天';
+            else if (diff === 1) label = '昨天';
+            else {
+              const d = new Date(ts);
+              label = `${d.getMonth()+1}月${d.getDate()}日`;
+            }
+            return { label, items: groups[key] };
+          });
+        });
+
+        function dateStr(offset) {
+          const d = new Date();
+          d.setDate(d.getDate() - offset);
+          return d.toISOString().slice(0, 10);
+        }
+        const todayStr = dateStr(0);
+        const yesterdayStr = dateStr(1);
+
+        const addForm = reactive({ subject: 'chinese', content: '', attachments: [], date: todayStr });
+
+        function handleFiles(e) {
+          const files = Array.from(e.target.files);
+          addForm.attachments.push(...files.map(f => f.name));
+          e.target.value = '';
+        }
+
+        async function addHomework() {
+          if (!addForm.content.trim()) return;
+          const createdDate = new Date(addForm.date + 'T' + new Date().toTimeString().slice(0, 8));
+          const hw = {
+            user: currentUser.value,
+            subject: addForm.subject,
+            content: addForm.content.trim(),
+            attachments: [...addForm.attachments],
+            createdAt: createdDate.toISOString()
+          };
+          await SupabaseService.addHomework(hw);
+          addForm.content = '';
+          addForm.attachments = [];
+          addForm.date = todayStr;
+          currentPage.value = 'homework';
+        }
+
+        async function deleteHomework(id) {
+          if (!confirm('确定删除这条作业吗？')) return;
+          await SupabaseService.deleteHomework(id);
+        }
+
+        // Checkin
+        const today = new Date().toISOString().slice(0, 10);
+        const todayCheckins = computed(() => checkinRecords.filter(r => r.user === currentUser.value && r.date === today));
+        const checkinHomeworkIds = ref([]);
+
+        function toggleHomeworkId(id, e) {
+          if (e.target.checked) {
+            if (!checkinHomeworkIds.value.includes(id)) checkinHomeworkIds.value.push(id);
+          } else {
+            checkinHomeworkIds.value = checkinHomeworkIds.value.filter(i => i !== id);
+          }
+        }
+
+        const todaySubjectHomework = computed(() => {
+          const hwDate = new Date();
+          const dayStart = new Date(hwDate.getFullYear(), hwDate.getMonth(), hwDate.getDate());
+          const dayEnd = new Date(dayStart.getTime() + 86400000);
+          return homeworkList.filter(h =>
+            h.user === currentUser.value &&
+            h.subject === checkinSubject.value &&
+            new Date(h.createdAt) >= dayStart &&
+            new Date(h.createdAt) < dayEnd
+          );
+        });
+
+        const timerRunning = ref(false);
+        const timerStarted = ref(false);
+        const timerElapsed = ref(0);
+        const timerStartTime = ref('');
+        let timerInterval = null;
+        let timerStartTs = 0;
+
+        function startTimer() {
+          timerRunning.value = true;
+          timerStarted.value = true;
+          timerStartTs = Date.now();
+          const now = new Date();
+          timerStartTime.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+          timerInterval = setInterval(() => { timerElapsed.value = Math.floor((Date.now() - timerStartTs) / 1000); }, 1000);
+        }
+
+        function pauseTimer() {
+          timerRunning.value = false;
+          clearInterval(timerInterval);
+          timerStartTs = Date.now() - timerElapsed.value * 1000;
+        }
+
+        function resumeTimer() {
+          timerRunning.value = true;
+          timerInterval = setInterval(() => { timerElapsed.value = Math.floor((Date.now() - timerStartTs) / 1000); }, 1000);
+        }
+
+        function handleCheckinFiles(e) {
+          const files = Array.from(e.target.files);
+          files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                checkinImagePreviews.push(ev.target.result);
+                checkinImages.push(ev.target.result);
+              };
+              reader.readAsDataURL(file);
+            } else {
+              checkinAttachments.push({ name: file.name });
+            }
+          });
+          e.target.value = '';
+        }
+
+        function removeCheckinImage(index) {
+          checkinImagePreviews.splice(index, 1);
+          checkinImages.splice(index, 1);
+        }
+
+        async function finishCheckin() {
+          clearInterval(timerInterval);
+          const now = new Date();
+          const endTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+          const record = {
+            user: currentUser.value,
+            subject: checkinSubject.value,
+            duration: timerElapsed.value,
+            startTime: timerStartTime.value,
+            endTime,
+            date: today,
+            attachments: [...checkinAttachments],
+            images: [...checkinImages],
+            homeworkIds: [...checkinHomeworkIds.value]
+          };
+          const newId = await SupabaseService.addCheckin(record);
+          if (!newId) {
+            alert('打卡失败，请检查网络连接或数据库配置');
+            return;
+          }
+          const localRecord = { ...record, id: newId, createdAt: new Date().toISOString() };
+          checkinRecords.unshift(localRecord);
+          SupabaseService.fetchCheckins(data => {
+            checkinRecords.splice(0, checkinRecords.length, ...data);
+          });
+          timerRunning.value = false;
+          timerStarted.value = false;
+          timerElapsed.value = 0;
+          timerStartTime.value = '';
+          checkinAttachments.length = 0;
+          checkinImagePreviews.length = 0;
+          checkinImages.length = 0;
+          checkinHomeworkIds.value = [];
+        }
+
+        // History
+        const history = computed(() =>
+          checkinRecords.filter(r => r.user === currentUser.value).sort((a, b) => b.date.localeCompare(a.date))
+        );
+
+        const totalDays = computed(() => new Set(history.value.map(r => r.date)).size);
+
+        const totalTimeStr = computed(() => {
+          const total = history.value.reduce((sum, r) => sum + r.duration, 0);
+          const h = Math.floor(total / 3600);
+          const m = Math.floor((total % 3600) / 60);
+          if (h > 0) return `${h}时${m}分`;
+          return `${m}分钟`;
+        });
+
+        const subjectStats = computed(() => {
+          const keys = ['chinese', 'math', 'english'];
+          const labels = { chinese: '语文', math: '数学', english: '英语' };
+          const counts = {};
+          keys.forEach(k => { counts[k] = history.value.filter(r => r.subject === k).length; });
+          const max = Math.max(...Object.values(counts), 1);
+          return keys.map(k => ({ key: k, label: labels[k], count: counts[k], percent: (counts[k] / max) * 100 }));
+        });
+
+        return {
+          users, currentUser, currentPage, filter, checkinSubject, showSwitchModal,
+          checkinAttachments, checkinImagePreviews, checkinHomeworkIds,
+          subjects, allSubjects,
+          selectUser, switchUser, go, subjectLabel, formatTime, formatDuration, getHomeworkCheckin, getHomeworkContent,
+          userHomework, filteredHomework, homeworkByDate, addForm, todayStr, yesterdayStr, handleFiles, addHomework, deleteHomework,
+          todayCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed,
+          startTimer, pauseTimer, resumeTimer,
+          handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId,
+          history, totalDays, totalTimeStr, subjectStats,
+          sbConfig, sbConnected, saveSbConfig
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
