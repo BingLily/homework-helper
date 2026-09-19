@@ -1026,18 +1026,21 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
         const timerElapsed = ref(0);
         const timerStartTime = ref('');
         let timerInterval = null;
+        let timerActionTs = 0;
         let timerStartTs = 0;
 
         function startTimer() {
           timerRunning.value = true;
           timerStarted.value = true;
           timerStartTs = Date.now();
+          timerActionTs = Date.now();
           const now = new Date();
           timerStartTime.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
           timerInterval = setInterval(() => { timerElapsed.value = Math.floor((Date.now() - timerStartTs) / 1000); }, 1000);
         }
 
         function pauseTimer() {
+          if (Date.now() - timerActionTs < 600) return;
           timerRunning.value = false;
           clearInterval(timerInterval);
           timerStartTs = Date.now() - timerElapsed.value * 1000;
@@ -1045,6 +1048,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
 
         function resumeTimer() {
           timerRunning.value = true;
+          timerActionTs = Date.now();
           timerInterval = setInterval(() => { timerElapsed.value = Math.floor((Date.now() - timerStartTs) / 1000); }, 1000);
         }
 
