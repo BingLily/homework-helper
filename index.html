@@ -550,18 +550,9 @@
         </div>
         <div class="music-tip" v-if="planError" style="color:#e65100;">{{ planError }}</div>
         <div class="file-list" style="margin-top:10px;" v-if="weekdaySlots.length">
-          <div class="card" style="margin-bottom:8px; padding:10px 12px;" v-for="s in weekdaySlots" :key="s.id">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <strong>{{ s.play_time }} ~ {{ s.end_time }}</strong>
-              <button class="switch-btn small" :class="{ on: draftOf(s).enabled }" @click="draftOf(s).enabled = !draftOf(s).enabled">{{ draftOf(s).enabled ? '开' : '关' }}</button>
-            </div>
-            <div class="hw-select-list">
-              <label class="hw-select-item" v-for="m in musicFiles" :key="m.id">
-                <input type="checkbox" :checked="draftOf(s).ids.includes(m.id)" @change="toggleDraftId(s, m.id, $event)" />
-                <span class="hw-select-text">🎵 {{ m.name }}</span>
-              </label>
-            </div>
-            <div class="music-tip" v-if="!draftOf(s).ids.length" style="color:#e65100;">未勾选音频，保存后该时段不会播放</div>
+          <div class="file-item" v-for="s in weekdaySlots" :key="s.id">
+            <span><strong>{{ s.play_time }} ~ {{ s.end_time }}</strong> {{ slotResourceNames(s) }}<em v-if="slotMissing(s)" class="hw-date-tag" style="color:#e65100;">缺音频</em></span>
+            <button class="remove-file" @click="deleteSlot(s.id)">×</button>
           </div>
         </div>
         <div v-else-if="!planError" class="music-tip">{{ weekdayLabel(planWeekday) }}还没有时段，在下面添加。</div>
@@ -581,12 +572,7 @@
             </label>
           </div>
           <div v-else class="music-tip">先在本机音频库添加音频，才能设时段。</div>
-          <button class="btn btn-primary btn-block" style="margin-top:10px;" :disabled="!slotForm.ids.length || !slotForm.start || !slotForm.end" @click="addSlot">添加到{{ weekdayLabel(planWeekday) }}计划</button>
-        </div>
-
-        <div style="display:flex; gap:10px; margin-top:12px;" v-if="weekdaySlots.length && !planError">
-          <button class="btn btn-primary" style="flex:1;" @click="saveDayPlan">💾 保存计划</button>
-          <button class="btn btn-danger" style="flex:1;" @click="deleteDayPlan">🗑️ 删除{{ weekdayLabel(planWeekday) }}计划</button>
+          <button class="btn btn-primary btn-block" style="margin-top:10px;" :disabled="!slotForm.ids.length || !slotForm.start || !slotForm.end" @click="addSlot">添加时段</button>
         </div>
       </div>
     </div>
@@ -1558,6 +1544,18 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           planSlots.value.filter(s => s.weekday === planWeekday.value).sort((a, b) => a.play_time.localeCompare(b.play_time))
         );
 
+        function slotResourceNames(s) {
+          const names = s.resourceIds.map(id => {
+            const m = musicFiles.value.find(x => x.id === id);
+            return m ? m.name : null;
+          }).filter(Boolean);
+          return names.length ? names.join('、') : '';
+        }
+
+        function slotMissing(s) {
+          return s.resourceIds.some(id => !musicFiles.value.find(x => x.id === id));
+        }
+
         async function loadMusicFiles() {
           try {
             musicFiles.value = (await MusicStore.all()).sort((a, b) => a.name.localeCompare(b.name, 'zh'));
@@ -1632,19 +1630,6 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           if (!musicEnabled.value) stopPlayback();
         }
 
-        const slotDrafts = reactive({});
-
-        function draftOf(s) {
-          if (!slotDrafts[s.id]) slotDrafts[s.id] = { enabled: s.enabled, ids: s.resourceIds.slice() };
-          return slotDrafts[s.id];
-        }
-
-        function toggleDraftId(s, id, e) {
-          const d = draftOf(s);
-          if (e.target.checked) { if (!d.ids.includes(id)) d.ids.push(id); }
-          else d.ids = d.ids.filter(x => x !== id);
-        }
-
         function loadPlan() {
           if (!SupabaseService.connected) {
             planError.value = '未连接云端：请先在设置页配置 Supabase，播放计划才能保存和同步。';
@@ -1658,7 +1643,6 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
             }
             planError.value = '';
             planSlots.value = rows;
-            Object.keys(slotDrafts).forEach(k => delete slotDrafts[k]);
           });
         }
 
@@ -1669,23 +1653,9 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           loadPlan();
         }
 
-        async function saveDayPlan() {
-          for (const s of weekdaySlots.value) {
-            const d = slotDrafts[s.id];
-            if (!d) continue;
-            if (d.enabled !== s.enabled || d.ids.join(',') !== s.resourceIds.slice().join(',')) {
-              await SupabaseService.updatePlanSlot(s.id, { enabled: d.enabled, resourceIds: d.ids.slice() });
-            }
-          }
-          alert('已保存' + weekdayLabel(planWeekday.value) + '的播放计划');
-          loadPlan();
-        }
-
-        async function deleteDayPlan() {
-          if (!confirm('删除' + weekdayLabel(planWeekday.value) + '的全部时段？')) return;
-          for (const s of weekdaySlots.value) {
-            await SupabaseService.deletePlanSlot(s.id);
-          }
+        async function deleteSlot(id) {
+          if (!confirm('删除这个时段？')) return;
+          await SupabaseService.deletePlanSlot(id);
           loadPlan();
         }
 
@@ -1746,8 +1716,8 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
           history, totalDays, totalTimeStr, subjectStats,
           musicFiles, planSlots, planError, planWeekday, weekdaySlots, slotForm, musicEnabled, nowPlayingName, nextSlotText,
-          weekdayLabel, handleMusicFiles, deleteMusicFile, testPlayMusic, toggleMusicEnabled,
-          addSlot, draftOf, toggleDraftId, saveDayPlan, deleteDayPlan, toggleSlotResourceId,
+          weekdayLabel, slotResourceNames, slotMissing, handleMusicFiles, deleteMusicFile, testPlayMusic, toggleMusicEnabled,
+          addSlot, deleteSlot, toggleSlotResourceId,
           sbConfig, sbConnected, saveSbConfig
         };
       }
