@@ -204,6 +204,12 @@
     .file-preview-hint { padding: 0 12px 8px; font-size: 12px; color: #ccc; flex-shrink: 0; }
     .file-preview-img { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
     .file-preview-frame { flex: 1; min-height: 0; width: 100%; border: none; background: white; }
+    .file-preview-doc { flex: 1; min-height: 0; width: 100%; overflow: auto; background: white; }
+    .file-preview-loading { color: #ccc; text-align: center; padding: 40px 20px; font-size: 14px; }
+    .docx-body { padding: 16px; font-size: 15px; line-height: 1.7; color: #333; word-break: break-word; }
+    .docx-body img { max-width: 100%; height: auto; }
+    .docx-body table { border-collapse: collapse; margin: 8px 0; }
+    .docx-body td, .docx-body th { border: 1px solid #ccc; padding: 4px 8px; }
 
     /* Settings Page */
     .settings-card { padding: 20px; }
@@ -611,7 +617,12 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
       </div>
       <div class="file-preview-hint" v-if="previewFile.kind === 'pdf'">下面空白的话，点右上角「下载」用手机自带阅读器打开</div>
       <img v-if="previewFile.kind === 'image'" :src="previewFile.url" class="file-preview-img" />
-      <iframe v-else :src="previewFile.url" class="file-preview-frame"></iframe>
+      <iframe v-else-if="previewFile.kind === 'pdf'" :src="previewFile.url" class="file-preview-frame"></iframe>
+      <div v-else class="file-preview-doc">
+        <div v-if="previewFile.loading" class="file-preview-loading">正在打开文档…</div>
+        <div v-else-if="previewFile.error" class="file-preview-loading">文档打不开，点右上角「下载」用 Word/WPS 打开</div>
+        <div v-else class="docx-body" v-html="previewFile.html"></div>
+      </div>
     </div>
   </div>
 
@@ -1006,6 +1017,58 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
 
         const previewFile = ref(null);
 
+        // 浏览器无法原生预览 docx，用 mammoth.js 本地转换；npmmirror 国内可达，作为首选
+        const MAMMOTH_SOURCES = [
+          'https://registry.npmmirror.com/mammoth/1.8.0/files/mammoth.browser.min.js',
+          'https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js',
+          'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js'
+        ];
+
+        function loadScriptOnce(srcs) {
+          return new Promise((resolve, reject) => {
+            if (window.mammoth) return resolve();
+            let i = 0;
+            const tryNext = () => {
+              if (i >= srcs.length) return reject(new Error('mammoth load failed'));
+              const s = document.createElement('script');
+              s.src = srcs[i++];
+              s.onload = () => resolve();
+              s.onerror = () => { s.remove(); tryNext(); };
+              document.head.appendChild(s);
+            };
+            tryNext();
+          });
+        }
+
+        function sanitizeHtml(html) {
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          doc.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(n => n.remove());
+          doc.querySelectorAll('*').forEach(n => {
+            Array.from(n.attributes).forEach(a => {
+              if (/^on/i.test(a.name) || (a.name === 'href' && /^javascript:/i.test(a.value))) n.removeAttribute(a.name);
+            });
+          });
+          return doc.body.innerHTML;
+        }
+
+        async function renderDocx(f) {
+          try {
+            await loadScriptOnce(MAMMOTH_SOURCES);
+            const buf = await dataUrlToBlob(f.data).arrayBuffer();
+            const res = await window.mammoth.convertToHtml({ arrayBuffer: buf });
+            if (previewFile.value && previewFile.value.raw === f) {
+              previewFile.value.html = sanitizeHtml(res.value || '');
+              previewFile.value.loading = false;
+            }
+          } catch (e) {
+            console.error('Docx preview error:', e);
+            if (previewFile.value && previewFile.value.raw === f) {
+              previewFile.value.loading = false;
+              previewFile.value.error = true;
+            }
+          }
+        }
+
         function dataUrlToBlob(dataUrl) {
           const comma = dataUrl.indexOf(',');
           const mime = (dataUrl.slice(5, comma).match(/[^;]+/) || ['application/octet-stream'])[0];
@@ -1021,10 +1084,14 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
             return;
           }
           const mime = (f.data.slice(5).match(/[^;,]+/) || [''])[0];
+          const isDocx = mime.indexOf('wordprocessingml') >= 0 || /\.docx$/i.test(f.name || '');
           if (mime.startsWith('image/')) {
             previewFile.value = { name: f.name, kind: 'image', url: f.data, raw: f };
           } else if (mime === 'application/pdf') {
             previewFile.value = { name: f.name, kind: 'pdf', url: URL.createObjectURL(dataUrlToBlob(f.data)), raw: f };
+          } else if (isDocx) {
+            previewFile.value = { name: f.name, kind: 'docx', url: '', html: '', loading: true, error: false, raw: f };
+            renderDocx(f);
           } else {
             downloadAttachment(f);
           }
