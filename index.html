@@ -209,6 +209,7 @@
     .hw-select-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #f9f9f9; border-radius: 10px; cursor: pointer; font-size: 14px; line-height: 1.5; }
     .hw-select-item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex-shrink: 0; }
     .hw-select-text { flex: 1; }
+    .hw-date-tag { font-style: normal; font-size: 11px; color: #888; background: #f0f0f0; padding: 1px 6px; border-radius: 6px; margin-left: 4px; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -333,17 +334,27 @@
             </button>
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label">作业日期</label>
+          <div class="date-quick-select">
+            <button class="date-btn" :class="{ active: checkinDate === todayStr }" @click="checkinDate = todayStr; checkinHomeworkIds = []">今天</button>
+            <button class="date-btn" :class="{ active: checkinDate === yesterdayStr }" @click="checkinDate = yesterdayStr; checkinHomeworkIds = []">昨天</button>
+            <label class="date-input-wrap">
+              <input type="date" v-model="checkinDate" class="date-input" @change="checkinHomeworkIds = []" />
+            </label>
+          </div>
+        </div>
         <div class="form-group" v-if="todaySubjectHomework.length > 0">
           <label class="form-label">选择要完成的作业</label>
           <div class="hw-select-list">
             <label class="hw-select-item" v-for="hw in todaySubjectHomework" :key="hw.id">
               <input type="checkbox" :checked="checkinHomeworkIds.includes(hw.id)" @change="toggleHomeworkId(hw.id, $event)" />
-              <span class="hw-select-text">{{ hw.content }}</span>
+              <span class="hw-select-text">{{ hw.content }} <em class="hw-date-tag">{{ hwDateLabel(hw) }}</em></span>
             </label>
           </div>
         </div>
         <div class="form-group" v-else-if="checkinSubject">
-          <div style="font-size:13px; color: var(--text-light); padding: 8px 0;">今日该科目暂无作业，可直接打卡</div>
+          <div style="font-size:13px; color: var(--text-light); padding: 8px 0;">该日期该科目暂无作业，可直接打卡</div>
         </div>
         <div class="form-group">
           <label class="form-label">上传作业照片/附件</label>
@@ -993,9 +1004,9 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           }
         }
 
+        const checkinDate = ref(todayStr);
         const todaySubjectHomework = computed(() => {
-          const hwDate = new Date();
-          const dayStart = new Date(hwDate.getFullYear(), hwDate.getMonth(), hwDate.getDate());
+          const dayStart = new Date(checkinDate.value + 'T00:00:00');
           const dayEnd = new Date(dayStart.getTime() + 86400000);
           return homeworkList.filter(h =>
             h.user === currentUser.value &&
@@ -1004,6 +1015,11 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
             new Date(h.createdAt) < dayEnd
           );
         });
+
+        function hwDateLabel(hw) {
+          const d = new Date(hw.createdAt);
+          return (d.getMonth() + 1) + '/' + d.getDate();
+        }
 
         const timerRunning = ref(false);
         const timerStarted = ref(false);
@@ -1119,7 +1135,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           subjects, allSubjects,
           selectUser, switchUser, go, subjectLabel, formatTime, formatDuration, getHomeworkCheckin, getHomeworkContent,
           userHomework, filteredHomework, homeworkByDate, addForm, todayStr, yesterdayStr, handleFiles, addHomework, deleteHomework, downloadAttachment,
-          todayCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed,
+          todayCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel,
           startTimer, pauseTimer, resumeTimer,
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
           history, totalDays, totalTimeStr, subjectStats,
