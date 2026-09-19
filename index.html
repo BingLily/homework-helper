@@ -356,6 +356,9 @@
         <div class="form-group" v-else-if="checkinSubject">
           <div style="font-size:13px; color: var(--text-light); padding: 8px 0;">该日期该科目暂无作业，请先在【添加】页添加作业后再打卡</div>
         </div>
+        <div class="form-group" v-if="todaySubjectHomework.length > 0 && checkinHomeworkIds.length === 0">
+          <div style="font-size:13px; color: var(--text-light); padding: 8px 0;">请勾选要完成的作业后再开始打卡</div>
+        </div>
         <div class="form-group" v-if="todaySubjectHomework.length > 0">
           <label class="form-label">上传作业照片/附件</label>
           <label class="upload-btn">
@@ -375,7 +378,7 @@
             </div>
           </div>
         </div>
-        <div class="timer-section" v-if="todaySubjectHomework.length > 0">
+        <div class="timer-section" v-if="(todaySubjectHomework.length > 0 && checkinHomeworkIds.length > 0) || timerStarted">
           <div class="timer-display">
             <span class="timer-label">已用时</span>
             <span class="timer-value">{{ formatDuration(timerElapsed) }}</span>
