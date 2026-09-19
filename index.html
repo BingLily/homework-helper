@@ -233,6 +233,16 @@
     .hw-select-item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex-shrink: 0; }
     .hw-select-text { flex: 1; }
     .hw-date-tag { font-style: normal; font-size: 11px; color: #888; background: #f0f0f0; padding: 1px 6px; border-radius: 6px; margin-left: 4px; white-space: nowrap; }
+
+    /* Music Schedule */
+    .music-switch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .switch-btn { min-width: 52px; padding: 6px 12px; border-radius: 16px; border: none; background: #ddd; color: #888; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+    .switch-btn.on { background: var(--primary); color: white; }
+    .switch-btn.small { min-width: 40px; padding: 4px 8px; font-size: 12px; }
+    .music-now, .music-next { margin-top: 8px; font-size: 13px; color: var(--primary-dark); font-weight: 600; }
+    .music-tip { font-size: 12px; color: var(--text-light); margin-top: 8px; line-height: 1.6; }
+    .weekday-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .weekday-tabs .date-btn { padding: 6px 10px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -497,6 +507,73 @@
       </div>
     </div>
 
+    <!-- MUSIC PAGE -->
+    <div v-if="currentPage === 'music'" class="page">
+      <h1 class="page-title">音乐定时播放</h1>
+
+      <div class="card">
+        <div class="music-switch-row">
+          <div>
+            <div style="font-size:15px; font-weight:700;">自动播放</div>
+            <div style="font-size:12px; color: var(--text-light); margin-top:4px;">{{ musicEnabled ? '到点自动播（需保持本页面/App 打开且亮屏）' : '已关闭，到点不会播' }}</div>
+          </div>
+          <button class="switch-btn" :class="{ on: musicEnabled }" @click="toggleMusicEnabled">{{ musicEnabled ? '开' : '关' }}</button>
+        </div>
+        <div class="music-now" v-if="nowPlayingName">🔊 正在播放：{{ nowPlayingName }}</div>
+        <div class="music-next" v-if="nextSlotText">⏰ 下次播放：{{ nextSlotText }}</div>
+      </div>
+
+      <div class="card">
+        <div class="settings-section-title">🎵 本机音频库</div>
+        <label class="upload-btn">
+          <span>📁 选择音频文件</span>
+          <input type="file" multiple accept="audio/*" @change="handleMusicFiles" />
+        </label>
+        <div class="file-list" v-if="musicFiles.length">
+          <div class="file-item" v-for="m in musicFiles" :key="m.id">
+            <span>🎵 {{ m.name }}</span>
+            <span style="display:flex; gap:6px;">
+              <button class="remove-file" style="color: var(--primary);" @click="testPlayMusic(m)">▶</button>
+              <button class="remove-file" @click="deleteMusicFile(m.id)">×</button>
+            </span>
+          </div>
+        </div>
+        <div v-else class="music-tip">还没有音频，先点上面添加。</div>
+        <div class="music-tip">音频只保存在当前这台设备上，不上传云端；换设备要重新添加。计划里引用了本机没有的音频时，到点会跳过它。</div>
+      </div>
+
+      <div class="card">
+        <div class="settings-section-title">📅 每周播放计划</div>
+        <div class="weekday-tabs">
+          <button v-for="d in 7" :key="d" class="date-btn" :class="{ active: planWeekday === d }" @click="planWeekday = d">{{ weekdayLabel(d) }}</button>
+        </div>
+        <div class="music-tip" v-if="planError" style="color:#e65100;">{{ planError }}</div>
+        <div class="file-list" style="margin-top:10px;" v-if="weekdaySlots.length">
+          <div class="file-item" v-for="s in weekdaySlots" :key="s.id">
+            <span><strong>{{ s.play_time }}</strong> {{ slotResourceNames(s) }}<em v-if="slotMissing(s)" class="hw-date-tag" style="color:#e65100;">缺音频</em></span>
+            <span style="display:flex; gap:6px; align-items:center;">
+              <button class="switch-btn small" :class="{ on: s.enabled }" @click="toggleSlot(s)">{{ s.enabled ? '开' : '关' }}</button>
+              <button class="remove-file" @click="deleteSlot(s.id)">×</button>
+            </span>
+          </div>
+        </div>
+        <div v-else-if="!planError" class="music-tip">{{ weekdayLabel(planWeekday) }}还没有时段，在下面添加。</div>
+
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+          <div class="form-label">给{{ weekdayLabel(planWeekday) }}加一个时段</div>
+          <input type="time" v-model="slotForm.time" class="date-input" style="width:140px; margin-bottom:8px;" />
+          <div class="hw-select-list" v-if="musicFiles.length">
+            <label class="hw-select-item" v-for="m in musicFiles" :key="m.id">
+              <input type="checkbox" :checked="slotForm.ids.includes(m.id)" @change="toggleSlotResourceId(m.id, $event)" />
+              <span class="hw-select-text">🎵 {{ m.name }}</span>
+            </label>
+          </div>
+          <div v-else class="music-tip">先在本机音频库添加音频，才能设时段。</div>
+          <button class="btn btn-primary btn-block" style="margin-top:10px;" :disabled="!slotForm.ids.length" @click="addSlot">添加时段</button>
+        </div>
+      </div>
+    </div>
+
     <!-- SETTINGS PAGE -->
     <div v-if="currentPage === 'settings'" class="page">
       <h1 class="page-title">设置</h1>
@@ -560,10 +637,20 @@ CREATE TABLE checkin (
   homework_ids jsonb default '[]',
   created_at timestamptz default now()
 );
+CREATE TABLE music_plan (
+  id bigserial primary key,
+  weekday int not null,
+  play_time text not null,
+  resource_ids jsonb default '[]',
+  enabled boolean default true,
+  created_at timestamptz default now()
+);
 ALTER TABLE homework ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkin ENABLE ROW LEVEL SECURITY;
+ALTER TABLE music_plan ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "open" ON homework FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
+CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code>
           </div>
         </div>
 
@@ -586,6 +673,9 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'history' }" @click="go('history')">
         <span class="nav-icon">📊</span><span>记录</span>
+      </button>
+      <button class="nav-item" :class="{ active: currentPage === 'music' }" @click="go('music')">
+        <span class="nav-icon">🎵</span><span>音乐</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'settings' }" @click="go('settings')">
         <span class="nav-icon">⚙️</span><span>设置</span>
@@ -686,6 +776,65 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           await this.client.from('checkin').delete().eq('id', id);
         } catch (e) {
           console.error('Delete checkin error:', e);
+        }
+      },
+
+      async fetchPlan(callback) {
+        if (!this.connected) return;
+        try {
+          const { data, error } = await this.client
+            .from('music_plan')
+            .select('*')
+            .order('weekday', { ascending: true })
+            .order('play_time', { ascending: true });
+          if (error) { console.error('Fetch plan error:', error); callback(null, error); return; }
+          callback((data || []).map(row => ({
+            id: row.id,
+            weekday: row.weekday,
+            play_time: row.play_time,
+            resourceIds: row.resource_ids || [],
+            enabled: row.enabled !== false
+          })));
+        } catch (e) {
+          console.error('Fetch plan error:', e);
+          callback(null, e);
+        }
+      },
+
+      async addPlanSlot(slot) {
+        if (!this.connected) return null;
+        try {
+          const { data: res, error } = await this.client
+            .from('music_plan')
+            .insert({ weekday: slot.weekday, play_time: slot.play_time, resource_ids: slot.resourceIds || [], enabled: slot.enabled !== false })
+            .select()
+            .single();
+          if (error) { console.error('Add plan slot error:', error); return null; }
+          return res.id;
+        } catch (e) {
+          console.error('Add plan slot error:', e);
+          return null;
+        }
+      },
+
+      async updatePlanSlot(id, patch) {
+        if (!this.connected) return;
+        try {
+          const body = {};
+          if (patch.enabled !== undefined) body.enabled = patch.enabled;
+          if (patch.resourceIds !== undefined) body.resource_ids = patch.resourceIds;
+          await this.client.from('music_plan').update(body).eq('id', id);
+        } catch (e) {
+          console.error('Update plan slot error:', e);
+        }
+      },
+
+      async deletePlanSlot(id) {
+        if (!this.connected) return;
+        try {
+          await this.client.from('music_plan').delete().eq('id', id);
+        } catch (e) {
+          console.error('Delete plan slot error:', e);
         }
       },
 
@@ -794,6 +943,54 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           try { this.client.removeChannel(ch); } catch (e) {}
         });
         this.channels = [];
+      }
+    };
+
+    // 音频只存本机 IndexedDB，不进云端
+    const MusicStore = {
+      db: null,
+      open() {
+        return new Promise((resolve, reject) => {
+          if (this.db) return resolve(this.db);
+          const req = indexedDB.open('hw-music', 1);
+          req.onupgradeneeded = () => { req.result.createObjectStore('files', { keyPath: 'id' }); };
+          req.onsuccess = () => { this.db = req.result; resolve(this.db); };
+          req.onerror = () => reject(req.error);
+        });
+      },
+      async put(rec) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('files', 'readwrite');
+          tx.objectStore('files').put(rec);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      },
+      async all() {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const rq = db.transaction('files').objectStore('files').getAll();
+          rq.onsuccess = () => resolve(rq.result || []);
+          rq.onerror = () => reject(rq.error);
+        });
+      },
+      async get(id) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const rq = db.transaction('files').objectStore('files').get(id);
+          rq.onsuccess = () => resolve(rq.result);
+          rq.onerror = () => reject(rq.error);
+        });
+      },
+      async del(id) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('files', 'readwrite');
+          tx.objectStore('files').delete(id);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
       }
     };
 
@@ -1293,6 +1490,169 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           return keys.map(k => ({ key: k, label: labels[k], count: counts[k], percent: (counts[k] / max) * 100 }));
         });
 
+        // Music schedule
+        const musicFiles = ref([]);
+        const planSlots = ref([]);
+        const planError = ref('');
+        const musicEnabled = ref(localStorage.getItem('musicAutoPlay') !== '0');
+        const nowPlayingName = ref('');
+        const planWeekday = ref(((new Date().getDay() + 6) % 7) + 1);
+        const slotForm = reactive({ time: '07:00', ids: [] });
+        let lastFiredKey = '';
+        let audioEl = null;
+        let playQueue = [];
+
+        function weekdayLabel(d) { return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][d - 1]; }
+
+        const weekdaySlots = computed(() =>
+          planSlots.value.filter(s => s.weekday === planWeekday.value).sort((a, b) => a.play_time.localeCompare(b.play_time))
+        );
+
+        function slotResourceNames(s) {
+          const names = s.resourceIds.map(id => {
+            const m = musicFiles.value.find(x => x.id === id);
+            return m ? m.name : null;
+          }).filter(Boolean);
+          return names.length ? names.join('、') : '';
+        }
+
+        function slotMissing(s) {
+          return s.resourceIds.some(id => !musicFiles.value.find(x => x.id === id));
+        }
+
+        async function loadMusicFiles() {
+          try {
+            musicFiles.value = (await MusicStore.all()).sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+          } catch (e) { console.error('Load music files error:', e); }
+        }
+
+        async function handleMusicFiles(e) {
+          const files = Array.from(e.target.files);
+          for (const f of files) {
+            await MusicStore.put({ id: 'm' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), name: f.name, blob: f });
+          }
+          e.target.value = '';
+          await loadMusicFiles();
+        }
+
+        async function deleteMusicFile(id) {
+          if (!confirm('删除这个音频？引用它的时段到点会跳过。')) return;
+          await MusicStore.del(id);
+          await loadMusicFiles();
+        }
+
+        function stopPlayback() {
+          if (audioEl) { audioEl.pause(); audioEl = null; }
+          playQueue = [];
+          nowPlayingName.value = '';
+        }
+
+        function playNextInQueue() {
+          if (!playQueue.length) { nowPlayingName.value = ''; audioEl = null; return; }
+          const id = playQueue.shift();
+          MusicStore.get(id).then(rec => {
+            if (!rec) { playNextInQueue(); return; }
+            const url = URL.createObjectURL(rec.blob);
+            audioEl = new Audio(url);
+            nowPlayingName.value = rec.name;
+            const done = () => { URL.revokeObjectURL(url); playNextInQueue(); };
+            audioEl.onended = done;
+            audioEl.onerror = done;
+            audioEl.play().catch(done);
+          }).catch(() => playNextInQueue());
+        }
+
+        function playResources(ids) {
+          stopPlayback();
+          playQueue = ids.slice();
+          playNextInQueue();
+        }
+
+        function testPlayMusic(m) { playResources([m.id]); }
+
+        function toggleMusicEnabled() {
+          musicEnabled.value = !musicEnabled.value;
+          localStorage.setItem('musicAutoPlay', musicEnabled.value ? '1' : '0');
+          if (!musicEnabled.value) stopPlayback();
+        }
+
+        function loadPlan() {
+          if (!SupabaseService.connected) {
+            planError.value = '未连接云端：请先在设置页配置 Supabase，播放计划才能保存和同步。';
+            return;
+          }
+          SupabaseService.fetchPlan((rows, err) => {
+            if (err) {
+              planError.value = '播放计划表还没建：到设置页复制建表 SQL（含 music_plan），在 Supabase 后台 SQL Editor 执行一次。';
+              planSlots.value = [];
+              return;
+            }
+            planError.value = '';
+            planSlots.value = rows;
+          });
+        }
+
+        async function addSlot() {
+          if (!slotForm.ids.length) return;
+          await SupabaseService.addPlanSlot({ weekday: planWeekday.value, play_time: slotForm.time, resourceIds: [...slotForm.ids], enabled: true });
+          slotForm.ids = [];
+          loadPlan();
+        }
+
+        async function toggleSlot(s) {
+          await SupabaseService.updatePlanSlot(s.id, { enabled: !s.enabled });
+          loadPlan();
+        }
+
+        async function deleteSlot(id) {
+          if (!confirm('删除这个时段？')) return;
+          await SupabaseService.deletePlanSlot(id);
+          loadPlan();
+        }
+
+        function toggleSlotResourceId(id, e) {
+          if (e.target.checked) { if (!slotForm.ids.includes(id)) slotForm.ids.push(id); }
+          else slotForm.ids = slotForm.ids.filter(x => x !== id);
+        }
+
+        const nextSlotText = computed(() => {
+          const now = new Date();
+          const curWd = ((now.getDay() + 6) % 7) + 1;
+          const curMin = now.getHours() * 60 + now.getMinutes();
+          let best = null;
+          for (let add = 0; add < 7; add++) {
+            const wd = ((curWd - 1 + add) % 7) + 1;
+            planSlots.value.filter(s => s.enabled && s.weekday === wd).forEach(s => {
+              const parts = s.play_time.split(':');
+              const mins = Number(parts[0]) * 60 + Number(parts[1]);
+              if (add === 0 && mins <= curMin) return;
+              const dist = add * 1440 + (mins - curMin);
+              if (!best || dist < best.dist) best = { dist, wd, time: s.play_time };
+            });
+          }
+          if (!best) return '';
+          return (best.wd === curWd ? '今天 ' : weekdayLabel(best.wd) + ' ') + best.time;
+        });
+
+        function checkSchedule() {
+          if (!musicEnabled.value || !planSlots.value.length) return;
+          const now = new Date();
+          const wd = ((now.getDay() + 6) % 7) + 1;
+          const hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          const key = wd + '-' + hm;
+          if (key === lastFiredKey) return;
+          const due = planSlots.value.filter(s => s.enabled && s.weekday === wd && s.play_time === hm);
+          if (!due.length) return;
+          lastFiredKey = key;
+          const ids = [];
+          due.forEach(s => s.resourceIds.forEach(id => { if (!ids.includes(id)) ids.push(id); }));
+          playResources(ids);
+        }
+
+        loadMusicFiles();
+        loadPlan();
+        setInterval(checkSchedule, 10000);
+
         return {
           users, currentUser, currentPage, filter, checkinSubject, showSwitchModal,
           checkinAttachments, checkinImagePreviews, checkinHomeworkIds,
@@ -1304,6 +1664,9 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           startTimer, pauseTimer, resumeTimer,
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
           history, totalDays, totalTimeStr, subjectStats,
+          musicFiles, planSlots, planError, planWeekday, weekdaySlots, slotForm, musicEnabled, nowPlayingName, nextSlotText,
+          weekdayLabel, slotResourceNames, slotMissing, handleMusicFiles, deleteMusicFile, testPlayMusic, toggleMusicEnabled,
+          addSlot, toggleSlot, deleteSlot, toggleSlotResourceId,
           sbConfig, sbConnected, saveSbConfig
         };
       }
