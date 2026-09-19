@@ -93,8 +93,14 @@
     .filter-btn.active.filter-english { background: var(--english); }
     .filter-btn.active.filter-exercise { background: var(--exercise); }
     .filter-btn.active.filter-interest { background: var(--interest); }
+    .hw-card { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+    .hw-card:active { transform: scale(0.98); box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
     .hw-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .hw-header-right { display: flex; align-items: center; gap: 6px; }
+    .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .page-head .page-title { margin-bottom: 0; }
+    .back-btn { background: white; border: 2px solid var(--border); border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 600; color: var(--text-light); cursor: pointer; flex-shrink: 0; }
+    .back-btn:active { background: #f0f0f0; }
     .checkin-badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px; white-space: nowrap; }
     .checkin-badge.done { background: #e8f5e9; color: #2e7d32; }
     .checkin-badge.pending { background: #fff3e0; color: #e65100; }
@@ -258,18 +264,18 @@
       <div v-else>
         <div v-for="group in homeworkByDate" :key="group.label">
           <div class="date-header">{{ group.label }}</div>
-          <div class="card" v-for="hw in group.items" :key="hw.id">
+          <div class="card hw-card" v-for="hw in group.items" :key="hw.id" @click="openCheckin(hw)">
             <div class="hw-header">
               <span class="subject-tag" :class="'subject-' + hw.subject">{{ subjectLabel(hw.subject) }}</span>
               <div class="hw-header-right">
                 <span v-if="getHomeworkCheckin(hw)" class="checkin-badge done">✅ {{ getHomeworkCheckin(hw).startTime }}-{{ getHomeworkCheckin(hw).endTime }} {{ formatDuration(getHomeworkCheckin(hw).duration) }}</span>
-                <span v-else class="checkin-badge pending">⏳ 未打卡</span>
-                <button class="delete-btn" @click="deleteHomework(hw.id)">🗑️</button>
+                <span v-else class="checkin-badge pending">⏳ 点我打卡</span>
+                <button class="delete-btn" @click.stop="deleteHomework(hw.id)">🗑️</button>
               </div>
             </div>
             <p class="hw-content">{{ hw.content }}</p>
             <div class="hw-attachments" v-if="hw.attachments && hw.attachments.length">
-              <a v-for="(f, i) in hw.attachments" :key="i" class="attachment-tag attachment-link" href="javascript:void(0)" @click="downloadAttachment(f)">📎 {{ (f && f.name) || f }}{{ f && f.data ? ' ⬇️' : '' }}</a>
+              <a v-for="(f, i) in hw.attachments" :key="i" class="attachment-tag attachment-link" href="javascript:void(0)" @click.stop="downloadAttachment(f)">📎 {{ (f && f.name) || f }}{{ f && f.data ? ' ⬇️' : '' }}</a>
             </div>
             <div class="hw-time">{{ formatTime(hw.createdAt) }}</div>
           </div>
@@ -323,7 +329,10 @@
 
     <!-- CHECKIN PAGE -->
     <div v-if="currentPage === 'checkin'" class="page">
-      <h1 class="page-title">今日打卡</h1>
+      <div class="page-head">
+        <button class="back-btn" @click="go('homework')">← 返回</button>
+        <h1 class="page-title">作业打卡</h1>
+      </div>
       <div class="card">
         <div class="form-group">
           <label class="form-label">选择科目</label>
@@ -391,9 +400,9 @@
           </div>
         </div>
       </div>
-      <div v-if="todayCheckins.length > 0" class="today-records">
-        <h2 class="section-title">今日已完成</h2>
-        <div class="card checkin-record" v-for="r in todayCheckins" :key="r.id">
+      <div v-if="dateCheckins.length > 0" class="today-records">
+        <h2 class="section-title">该日已完成</h2>
+        <div class="card checkin-record" v-for="r in dateCheckins" :key="r.id">
           <div class="record-header">
             <span class="subject-tag" :class="'subject-' + r.subject">{{ subjectLabel(r.subject) }}</span>
             <span class="record-status">✅ 已完成</span>
@@ -551,15 +560,12 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
     </div>
 
     <!-- NAV BAR -->
-    <nav class="nav-bar" v-if="currentUser">
+    <nav class="nav-bar" v-if="currentUser && currentPage !== 'checkin'">
       <button class="nav-item" :class="{ active: currentPage === 'homework' }" @click="go('homework')">
         <span class="nav-icon">📚</span><span>作业</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'add' }" @click="go('add')">
         <span class="nav-icon">➕</span><span>添加</span>
-      </button>
-      <button class="nav-item" :class="{ active: currentPage === 'checkin' }" @click="go('checkin')">
-        <span class="nav-icon">✅</span><span>打卡</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'history' }" @click="go('history')">
         <span class="nav-icon">📊</span><span>记录</span>
@@ -995,8 +1001,6 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
         }
 
         // Checkin
-        const today = new Date().toISOString().slice(0, 10);
-        const todayCheckins = computed(() => checkinRecords.filter(r => r.user === currentUser.value && r.date === today));
         const checkinHomeworkIds = ref([]);
 
         function toggleHomeworkId(id, e) {
@@ -1023,6 +1027,10 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           const d = new Date(hw.createdAt);
           return (d.getMonth() + 1) + '/' + d.getDate();
         }
+
+        const dateCheckins = computed(() =>
+          checkinRecords.filter(r => r.user === currentUser.value && r.date === checkinDate.value)
+        );
 
         const timerRunning = ref(false);
         const timerStarted = ref(false);
@@ -1053,6 +1061,27 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           timerRunning.value = true;
           timerActionTs = Date.now();
           timerInterval = setInterval(() => { timerElapsed.value = Math.floor((Date.now() - timerStartTs) / 1000); }, 1000);
+        }
+
+        function resetTimer() {
+          clearInterval(timerInterval);
+          timerRunning.value = false;
+          timerStarted.value = false;
+          timerElapsed.value = 0;
+          timerStartTime.value = '';
+        }
+
+        function openCheckin(hw) {
+          const sameOne = checkinHomeworkIds.value.length === 1 && checkinHomeworkIds.value[0] === hw.id;
+          if (timerStarted.value && !sameOne) {
+            if (!confirm('当前有一次正在计时的打卡，切换到别的作业会放弃这次计时，确定吗？')) return;
+            resetTimer();
+          }
+          const d = new Date(hw.createdAt);
+          checkinSubject.value = hw.subject;
+          checkinDate.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          checkinHomeworkIds.value = [hw.id];
+          currentPage.value = 'checkin';
         }
 
         function handleCheckinFiles(e) {
@@ -1087,7 +1116,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
             duration: timerElapsed.value,
             startTime: timerStartTime.value,
             endTime,
-            date: today,
+            date: checkinDate.value,
             attachments: [...checkinAttachments],
             images: [...checkinImages],
             homeworkIds: [...checkinHomeworkIds.value]
@@ -1102,10 +1131,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           SupabaseService.fetchCheckins(data => {
             checkinRecords.splice(0, checkinRecords.length, ...data);
           });
-          timerRunning.value = false;
-          timerStarted.value = false;
-          timerElapsed.value = 0;
-          timerStartTime.value = '';
+          resetTimer();
           checkinAttachments.length = 0;
           checkinImagePreviews.length = 0;
           checkinImages.length = 0;
@@ -1142,7 +1168,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           subjects, allSubjects,
           selectUser, switchUser, go, subjectLabel, formatTime, formatDuration, getHomeworkCheckin, getHomeworkContent,
           userHomework, filteredHomework, homeworkByDate, addForm, todayStr, yesterdayStr, handleFiles, addHomework, deleteHomework, downloadAttachment,
-          todayCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel,
+          dateCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel, openCheckin,
           startTimer, pauseTimer, resumeTimer,
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
           history, totalDays, totalTimeStr, subjectStats,
