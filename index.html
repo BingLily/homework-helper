@@ -194,6 +194,17 @@
     .record-img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; }
     .record-file-list { display: flex; flex-wrap: wrap; gap: 4px; }
 
+    /* File Preview Overlay */
+    .file-preview-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 300; display: flex; flex-direction: column; }
+    .file-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; color: white; flex-shrink: 0; }
+    .file-preview-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-preview-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .file-preview-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .file-preview-btn:active { background: rgba(255,255,255,0.35); }
+    .file-preview-hint { padding: 0 12px 8px; font-size: 12px; color: #ccc; flex-shrink: 0; }
+    .file-preview-img { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
+    .file-preview-frame { flex: 1; min-height: 0; width: 100%; border: none; background: white; }
+
     /* Settings Page */
     .settings-card { padding: 20px; }
     .settings-section { margin-bottom: 24px; }
@@ -275,7 +286,7 @@
             </div>
             <p class="hw-content">{{ hw.content }}</p>
             <div class="hw-attachments" v-if="hw.attachments && hw.attachments.length">
-              <a v-for="(f, i) in hw.attachments" :key="i" class="attachment-tag attachment-link" href="javascript:void(0)" @click.stop="downloadAttachment(f)">📎 {{ (f && f.name) || f }}{{ f && f.data ? ' ⬇️' : '' }}</a>
+              <a v-for="(f, i) in hw.attachments" :key="i" class="attachment-tag attachment-link" href="javascript:void(0)" @click.stop="openAttachment(f)">📎 {{ (f && f.name) || f }}{{ f && f.data ? ' 👁' : '' }}</a>
             </div>
             <div class="hw-time">{{ formatTime(hw.createdAt) }}</div>
           </div>
@@ -588,6 +599,19 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
         </div>
         <button class="modal-close" @click="showSwitchModal = false">取消</button>
       </div>
+    </div>
+    <!-- FILE PREVIEW OVERLAY -->
+    <div class="file-preview-overlay" v-if="previewFile" @click.self="closePreview">
+      <div class="file-preview-head">
+        <span class="file-preview-name">{{ previewFile.name }}</span>
+        <div class="file-preview-actions">
+          <button class="file-preview-btn" @click="downloadAttachment(previewFile.raw)">⬇️ 下载</button>
+          <button class="file-preview-btn" @click="closePreview">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="file-preview-hint" v-if="previewFile.kind === 'pdf'">下面空白的话，点右上角「下载」用手机自带阅读器打开</div>
+      <img v-if="previewFile.kind === 'image'" :src="previewFile.url" class="file-preview-img" />
+      <iframe v-else :src="previewFile.url" class="file-preview-frame"></iframe>
     </div>
   </div>
 
@@ -980,6 +1004,37 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           document.body.removeChild(a);
         }
 
+        const previewFile = ref(null);
+
+        function dataUrlToBlob(dataUrl) {
+          const comma = dataUrl.indexOf(',');
+          const mime = (dataUrl.slice(5, comma).match(/[^;]+/) || ['application/octet-stream'])[0];
+          const bin = atob(dataUrl.slice(comma + 1));
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          return new Blob([bytes], { type: mime });
+        }
+
+        function openAttachment(f) {
+          if (!f || typeof f === 'string' || !f.data) {
+            alert('该附件只保存了文件名，没有文件内容，无法打开');
+            return;
+          }
+          const mime = (f.data.slice(5).match(/[^;,]+/) || [''])[0];
+          if (mime.startsWith('image/')) {
+            previewFile.value = { name: f.name, kind: 'image', url: f.data, raw: f };
+          } else if (mime === 'application/pdf') {
+            previewFile.value = { name: f.name, kind: 'pdf', url: URL.createObjectURL(dataUrlToBlob(f.data)), raw: f };
+          } else {
+            downloadAttachment(f);
+          }
+        }
+
+        function closePreview() {
+          if (previewFile.value && previewFile.value.kind === 'pdf') URL.revokeObjectURL(previewFile.value.url);
+          previewFile.value = null;
+        }
+
         async function addHomework() {
           if (!addForm.content.trim()) return;
           const createdDate = new Date(addForm.date + 'T' + new Date().toTimeString().slice(0, 8));
@@ -1177,6 +1232,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           subjects, allSubjects,
           selectUser, switchUser, go, subjectLabel, formatTime, formatDuration, timeRange, getHomeworkCheckin, getHomeworkContent,
           userHomework, filteredHomework, homeworkByDate, addForm, todayStr, yesterdayStr, handleFiles, addHomework, deleteHomework, downloadAttachment,
+          previewFile, openAttachment, closePreview,
           dateCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel, openCheckin,
           startTimer, pauseTimer, resumeTimer,
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
