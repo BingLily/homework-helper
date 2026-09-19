@@ -633,7 +633,7 @@
             3. 在 SQL Editor 中执行建表语句（见下方）<br>
             4. 在 Settings → Database 中开启 Realtime（homework 和 checkin 表）<br><br>
             <strong>建表 SQL：</strong><br>
-            <code style="font-size:11px; background:#f5f5f5; padding:8px; border-radius:6px; display:block; white-space:pre; overflow-x:auto;">CREATE TABLE homework (
+            <code style="font-size:11px; background:#f5f5f5; padding:8px; border-radius:6px; display:block; white-space:pre; overflow-x:auto;">CREATE TABLE IF NOT EXISTS homework (
   id bigserial primary key,
   "user" text not null,
   subject text not null,
@@ -641,7 +641,7 @@
   attachments jsonb default '[]',
   created_at timestamptz default now()
 );
-CREATE TABLE checkin (
+CREATE TABLE IF NOT EXISTS checkin (
   id bigserial primary key,
   "user" text not null,
   subject text not null,
@@ -654,7 +654,7 @@ CREATE TABLE checkin (
   homework_ids jsonb default '[]',
   created_at timestamptz default now()
 );
-CREATE TABLE music_plan (
+CREATE TABLE IF NOT EXISTS music_plan (
   id bigserial primary key,
   weekday int not null,
   play_time text not null,
@@ -667,6 +667,9 @@ ALTER TABLE music_plan ADD COLUMN IF NOT EXISTS end_time text;
 ALTER TABLE homework ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkin ENABLE ROW LEVEL SECURITY;
 ALTER TABLE music_plan ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "open" ON homework;
+DROP POLICY IF EXISTS "open" ON checkin;
+DROP POLICY IF EXISTS "open" ON music_plan;
 CREATE POLICY "open" ON homework FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code>
