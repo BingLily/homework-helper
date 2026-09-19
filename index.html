@@ -161,6 +161,7 @@
     .history-card { padding: 12px 16px; }
     .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .history-date { font-size: 13px; color: #aaa; }
+    .history-header-right { display: flex; align-items: center; gap: 8px; }
     .history-detail { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-light); }
 
     /* User Switch Modal */
@@ -438,7 +439,10 @@
         <div class="card history-card" v-for="r in history" :key="r.id">
           <div class="history-header">
             <span class="subject-tag" :class="'subject-' + r.subject">{{ subjectLabel(r.subject) }}</span>
-            <span class="history-date">{{ r.date }}</span>
+            <div class="history-header-right">
+              <span class="history-date">{{ r.date }}</span>
+              <button class="delete-btn" @click="deleteCheckin(r.id)">🗑️</button>
+            </div>
           </div>
           <div class="history-detail">
             <span>⏱ {{ formatDuration(r.duration) }}</span>
@@ -621,6 +625,15 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           await this.client.from('homework').delete().eq('id', id);
         } catch (e) {
           console.error('Delete homework error:', e);
+        }
+      },
+
+      async deleteCheckin(id) {
+        if (!this.connected) return;
+        try {
+          await this.client.from('checkin').delete().eq('id', id);
+        } catch (e) {
+          console.error('Delete checkin error:', e);
         }
       },
 
@@ -963,6 +976,13 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           await SupabaseService.deleteHomework(id);
         }
 
+        async function deleteCheckin(id) {
+          if (!confirm('确定删除这条打卡记录吗？')) return;
+          await SupabaseService.deleteCheckin(id);
+          const idx = checkinRecords.findIndex(r => r.id === id);
+          if (idx >= 0) checkinRecords.splice(idx, 1);
+        }
+
         // Checkin
         const today = new Date().toISOString().slice(0, 10);
         const todayCheckins = computed(() => checkinRecords.filter(r => r.user === currentUser.value && r.date === today));
@@ -1104,7 +1124,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           userHomework, filteredHomework, homeworkByDate, addForm, todayStr, yesterdayStr, handleFiles, addHomework, deleteHomework, downloadAttachment,
           todayCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed,
           startTimer, pauseTimer, resumeTimer,
-          handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId,
+          handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
           history, totalDays, totalTimeStr, subjectStats,
           sbConfig, sbConnected, saveSbConfig
         };
