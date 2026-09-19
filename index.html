@@ -552,7 +552,7 @@
         <div class="file-list" style="margin-top:10px;" v-if="weekdaySlots.length">
           <div class="file-item" v-for="s in weekdaySlots" :key="s.id">
             <span><strong>{{ s.play_time }} ~ {{ s.end_time }}</strong> {{ slotResourceNames(s) }}<em v-if="slotMissing(s)" class="hw-date-tag" style="color:#e65100;">缺音频</em></span>
-            <button class="remove-file" @click="deleteSlot(s.id)">×</button>
+            <button class="btn btn-danger" style="padding:6px 14px; font-size:13px; flex-shrink:0;" @click="deleteSlot(s.id)">🗑️ 删除</button>
           </div>
         </div>
         <div v-else-if="!planError" class="music-tip">{{ weekdayLabel(planWeekday) }}还没有时段，在下面添加。</div>
