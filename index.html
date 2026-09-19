@@ -826,18 +826,6 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         }
       },
 
-      async updatePlanSlot(id, patch) {
-        if (!this.connected) return;
-        try {
-          const body = {};
-          if (patch.enabled !== undefined) body.enabled = patch.enabled;
-          if (patch.resourceIds !== undefined) body.resource_ids = patch.resourceIds;
-          await this.client.from('music_plan').update(body).eq('id', id);
-        } catch (e) {
-          console.error('Update plan slot error:', e);
-        }
-      },
-
       async deletePlanSlot(id) {
         if (!this.connected) return;
         try {
