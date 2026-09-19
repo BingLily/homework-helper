@@ -509,7 +509,7 @@
 
     <!-- MUSIC PAGE -->
     <div v-if="currentPage === 'music'" class="page">
-      <h1 class="page-title">音乐定时播放</h1>
+      <h1 class="page-title">熏听定时播放</h1>
 
       <div class="card">
         <div class="music-switch-row">
@@ -675,7 +675,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         <span class="nav-icon">📊</span><span>记录</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'music' }" @click="go('music')">
-        <span class="nav-icon">🎵</span><span>音乐</span>
+        <span class="nav-icon">🎵</span><span>熏听</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'settings' }" @click="go('settings')">
         <span class="nav-icon">⚙️</span><span>设置</span>
