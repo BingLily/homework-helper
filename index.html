@@ -520,6 +520,7 @@
           <button class="switch-btn" :class="{ on: musicEnabled }" @click="toggleMusicEnabled">{{ musicEnabled ? '开' : '关' }}</button>
         </div>
         <div class="music-now" v-if="nowPlayingName">🔊 正在播放：{{ nowPlayingName }}</div>
+        <button class="btn btn-danger btn-block" style="margin-top:10px;" v-if="nowPlayingName" @click="stopMusic">⏹ 停止播放</button>
         <div class="music-next" v-if="nextSlotText">⏰ 下次播放：{{ nextSlotText }}</div>
       </div>
 
@@ -1498,6 +1499,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         let audioEl = null;
         let playQueue = [];
         let curLoop = null;
+        let stoppedSig = '';
 
         function weekdayLabel(d) { return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][d - 1]; }
 
@@ -1593,7 +1595,13 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
             const done = () => { URL.revokeObjectURL(url); playNextInQueue(); };
             audioEl.onended = done;
             audioEl.onerror = done;
-            audioEl.play().catch(done);
+            audioEl.play().catch(() => {
+              URL.revokeObjectURL(url);
+              audioEl = null;
+              playQueue = [];
+              curLoop = null;
+              nowPlayingName.value = '';
+            });
           }).catch(() => playNextInQueue());
         }
 
@@ -1611,6 +1619,12 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         }
 
         function testPlayMusic(m) { playResources([m.id]); }
+
+        function stopMusic() {
+          const ids = activeIdsAt(new Date());
+          stoppedSig = ids.length ? ids.slice().sort().join(',') : '';
+          stopPlayback();
+        }
 
         function toggleMusicEnabled() {
           musicEnabled.value = !musicEnabled.value;
@@ -1676,8 +1690,9 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           if (!musicEnabled.value || !planSlots.value.length) { if (curLoop) stopLoop(); return; }
           const now = new Date();
           const ids = activeIdsAt(now);
-          if (!ids.length) { if (curLoop) stopLoop(); return; }
+          if (!ids.length) { stoppedSig = ''; if (curLoop) stopLoop(); return; }
           const sig = ids.slice().sort().join(',');
+          if (sig === stoppedSig) return;
           if (curLoop && curLoop.sig === sig && (audioEl || playQueue.length)) return;
           const loop = { sig };
           startLoop(ids, () => {
@@ -1704,7 +1719,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
           history, totalDays, totalTimeStr, subjectStats,
           musicFiles, planSlots, planError, planWeekday, weekdaySlots, slotForm, musicEnabled, nowPlayingName, nextSlotText,
-          weekdayLabel, slotResourceNames, slotMissing, handleMusicFiles, deleteMusicFile, testPlayMusic, toggleMusicEnabled,
+          weekdayLabel, slotResourceNames, slotMissing, handleMusicFiles, deleteMusicFile, testPlayMusic, stopMusic, toggleMusicEnabled,
           addSlot, deleteSlot, toggleSlotResourceId,
           sbConfig, sbConnected, saveSbConfig
         };
