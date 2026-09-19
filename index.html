@@ -268,10 +268,7 @@
             </div>
             <p class="hw-content">{{ hw.content }}</p>
             <div class="hw-attachments" v-if="hw.attachments && hw.attachments.length">
-              <template v-for="(f, i) in hw.attachments" :key="i">
-                <a v-if="f && f.data" class="attachment-tag attachment-link" href="javascript:void(0)" @click="downloadAttachment(f)">📎 {{ f.name }} ⬇️</a>
-                <span v-else class="attachment-tag">📎 {{ (f && f.name) || f }}</span>
-              </template>
+              <a v-for="(f, i) in hw.attachments" :key="i" class="attachment-tag attachment-link" href="javascript:void(0)" @click="downloadAttachment(f)">📎 {{ (f && f.name) || f }}{{ f && f.data ? ' ⬇️' : '' }}</a>
             </div>
             <div class="hw-time">{{ formatTime(hw.createdAt) }}</div>
           </div>
