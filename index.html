@@ -550,7 +550,7 @@
         <div class="music-tip" v-if="planError" style="color:#e65100;">{{ planError }}</div>
         <div class="file-list" style="margin-top:10px;" v-if="weekdaySlots.length">
           <div class="file-item" v-for="s in weekdaySlots" :key="s.id">
-            <span><strong>{{ s.play_time }}</strong> {{ slotResourceNames(s) }}<em v-if="slotMissing(s)" class="hw-date-tag" style="color:#e65100;">缺音频</em></span>
+            <span><strong>{{ s.play_time }} ~ {{ s.end_time }}</strong> {{ slotResourceNames(s) }}<em v-if="slotMissing(s)" class="hw-date-tag" style="color:#e65100;">缺音频</em></span>
             <span style="display:flex; gap:6px; align-items:center;">
               <button class="switch-btn small" :class="{ on: s.enabled }" @click="toggleSlot(s)">{{ s.enabled ? '开' : '关' }}</button>
               <button class="remove-file" @click="deleteSlot(s.id)">×</button>
@@ -561,7 +561,12 @@
 
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
           <div class="form-label">给{{ weekdayLabel(planWeekday) }}加一个时段</div>
-          <input type="time" v-model="slotForm.time" class="date-input" style="width:140px; margin-bottom:8px;" />
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+            <input type="time" v-model="slotForm.start" class="date-input" style="width:130px;" />
+            <span>~</span>
+            <input type="time" v-model="slotForm.end" class="date-input" style="width:130px;" />
+          </div>
+          <div class="music-tip" style="margin-bottom:8px;">时间段内循环播放：播完从头再来，到结束时间自动停止。</div>
           <div class="hw-select-list" v-if="musicFiles.length">
             <label class="hw-select-item" v-for="m in musicFiles" :key="m.id">
               <input type="checkbox" :checked="slotForm.ids.includes(m.id)" @change="toggleSlotResourceId(m.id, $event)" />
@@ -569,7 +574,7 @@
             </label>
           </div>
           <div v-else class="music-tip">先在本机音频库添加音频，才能设时段。</div>
-          <button class="btn btn-primary btn-block" style="margin-top:10px;" :disabled="!slotForm.ids.length" @click="addSlot">添加时段</button>
+          <button class="btn btn-primary btn-block" style="margin-top:10px;" :disabled="!slotForm.ids.length || !slotForm.start || !slotForm.end" @click="addSlot">添加时段</button>
         </div>
       </div>
     </div>
@@ -641,10 +646,12 @@ CREATE TABLE music_plan (
   id bigserial primary key,
   weekday int not null,
   play_time text not null,
+  end_time text,
   resource_ids jsonb default '[]',
   enabled boolean default true,
   created_at timestamptz default now()
 );
+ALTER TABLE music_plan ADD COLUMN IF NOT EXISTS end_time text;
 ALTER TABLE homework ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkin ENABLE ROW LEVEL SECURITY;
 ALTER TABLE music_plan ENABLE ROW LEVEL SECURITY;
@@ -792,6 +799,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
             id: row.id,
             weekday: row.weekday,
             play_time: row.play_time,
+            end_time: row.end_time || '',
             resourceIds: row.resource_ids || [],
             enabled: row.enabled !== false
           })));
@@ -806,7 +814,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         try {
           const { data: res, error } = await this.client
             .from('music_plan')
-            .insert({ weekday: slot.weekday, play_time: slot.play_time, resource_ids: slot.resourceIds || [], enabled: slot.enabled !== false })
+            .insert({ weekday: slot.weekday, play_time: slot.play_time, end_time: slot.end_time || null, resource_ids: slot.resourceIds || [], enabled: slot.enabled !== false })
             .select()
             .single();
           if (error) { console.error('Add plan slot error:', error); return null; }
@@ -1497,12 +1505,39 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         const musicEnabled = ref(localStorage.getItem('musicAutoPlay') !== '0');
         const nowPlayingName = ref('');
         const planWeekday = ref(((new Date().getDay() + 6) % 7) + 1);
-        const slotForm = reactive({ time: '07:00', ids: [] });
-        let lastFiredKey = '';
+        const slotForm = reactive({ start: '07:00', end: '07:30', ids: [] });
         let audioEl = null;
         let playQueue = [];
+        let curLoop = null;
 
         function weekdayLabel(d) { return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][d - 1]; }
+
+        function toMin(t) { const p = String(t || '').split(':'); return Number(p[0]) * 60 + Number(p[1] || 0); }
+        function inSlotWindow(s, curMin) {
+          const st = toMin(s.play_time);
+          if (!s.end_time) return curMin >= st;
+          const en = toMin(s.end_time);
+          if (en > st) return curMin >= st && curMin < en;
+          return curMin >= st || curMin < en;
+        }
+        function activeIdsAt(when) {
+          const wd = ((when.getDay() + 6) % 7) + 1;
+          const curMin = when.getHours() * 60 + when.getMinutes();
+          const ids = [];
+          planSlots.value.forEach(s => {
+            if (!s.enabled || s.weekday !== wd || !inSlotWindow(s, curMin)) return;
+            s.resourceIds.forEach(id => { if (!ids.includes(id)) ids.push(id); });
+          });
+          const yday = new Date(when.getTime() - 86400000);
+          const yWd = ((yday.getDay() + 6) % 7) + 1;
+          const yMin = yday.getHours() * 60 + yday.getMinutes();
+          planSlots.value.forEach(s => {
+            if (!s.enabled || s.weekday !== yWd || !s.end_time) return;
+            if (toMin(s.end_time) >= toMin(s.play_time) || !inSlotWindow(s, yMin)) return;
+            s.resourceIds.forEach(id => { if (!ids.includes(id)) ids.push(id); });
+          });
+          return ids;
+        }
 
         const weekdaySlots = computed(() =>
           planSlots.value.filter(s => s.weekday === planWeekday.value).sort((a, b) => a.play_time.localeCompare(b.play_time))
@@ -1544,11 +1579,22 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         function stopPlayback() {
           if (audioEl) { audioEl.pause(); audioEl = null; }
           playQueue = [];
+          curLoop = null;
+          nowPlayingName.value = '';
+        }
+
+        function stopLoop() {
+          if (audioEl) { audioEl.pause(); audioEl = null; }
+          playQueue = [];
+          curLoop = null;
           nowPlayingName.value = '';
         }
 
         function playNextInQueue() {
-          if (!playQueue.length) { nowPlayingName.value = ''; audioEl = null; return; }
+          if (!playQueue.length) {
+            if (curLoop && curLoop.inWindow()) { playQueue = curLoop.ids.slice(); }
+            else { nowPlayingName.value = ''; audioEl = null; return; }
+          }
           const id = playQueue.shift();
           MusicStore.get(id).then(rec => {
             if (!rec) { playNextInQueue(); return; }
@@ -1560,6 +1606,13 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
             audioEl.onerror = done;
             audioEl.play().catch(done);
           }).catch(() => playNextInQueue());
+        }
+
+        function startLoop(ids, inWindow) {
+          if (audioEl) { audioEl.pause(); audioEl = null; }
+          curLoop = { ids: ids.slice(), inWindow };
+          playQueue = [];
+          playNextInQueue();
         }
 
         function playResources(ids) {
@@ -1593,8 +1646,8 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         }
 
         async function addSlot() {
-          if (!slotForm.ids.length) return;
-          await SupabaseService.addPlanSlot({ weekday: planWeekday.value, play_time: slotForm.time, resourceIds: [...slotForm.ids], enabled: true });
+          if (!slotForm.ids.length || !slotForm.start || !slotForm.end) return;
+          await SupabaseService.addPlanSlot({ weekday: planWeekday.value, play_time: slotForm.start, end_time: slotForm.end, resourceIds: [...slotForm.ids], enabled: true });
           slotForm.ids = [];
           loadPlan();
         }
@@ -1620,14 +1673,15 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           const curWd = ((now.getDay() + 6) % 7) + 1;
           const curMin = now.getHours() * 60 + now.getMinutes();
           let best = null;
-          for (let add = 0; add < 7; add++) {
+          for (let add = 0; add <= 7; add++) {
             const wd = ((curWd - 1 + add) % 7) + 1;
             planSlots.value.filter(s => s.enabled && s.weekday === wd).forEach(s => {
-              const parts = s.play_time.split(':');
-              const mins = Number(parts[0]) * 60 + Number(parts[1]);
-              if (add === 0 && mins <= curMin) return;
+              const mins = toMin(s.play_time);
+              if (add === 0 && (mins <= curMin || inSlotWindow(s, curMin))) return;
+              if (add === 7 && wd !== curWd) return;
               const dist = add * 1440 + (mins - curMin);
-              if (!best || dist < best.dist) best = { dist, wd, time: s.play_time };
+              if (dist <= 0) return;
+              if (!best || dist < best.dist) best = { dist, wd, time: s.play_time + (s.end_time ? ' ~ ' + s.end_time : '') };
             });
           }
           if (!best) return '';
@@ -1635,18 +1689,19 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         });
 
         function checkSchedule() {
-          if (!musicEnabled.value || !planSlots.value.length) return;
+          if (!musicEnabled.value || !planSlots.value.length) { if (curLoop) stopLoop(); return; }
           const now = new Date();
-          const wd = ((now.getDay() + 6) % 7) + 1;
-          const hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-          const key = wd + '-' + hm;
-          if (key === lastFiredKey) return;
-          const due = planSlots.value.filter(s => s.enabled && s.weekday === wd && s.play_time === hm);
-          if (!due.length) return;
-          lastFiredKey = key;
-          const ids = [];
-          due.forEach(s => s.resourceIds.forEach(id => { if (!ids.includes(id)) ids.push(id); }));
-          playResources(ids);
+          const ids = activeIdsAt(now);
+          if (!ids.length) { if (curLoop) stopLoop(); return; }
+          const sig = ids.slice().sort().join(',');
+          if (curLoop && curLoop.sig === sig && (audioEl || playQueue.length)) return;
+          const loop = { sig };
+          startLoop(ids, () => {
+            const n = new Date();
+            const a = activeIdsAt(n);
+            return a.length && a.slice().sort().join(',') === loop.sig;
+          });
+          curLoop.sig = sig;
         }
 
         loadMusicFiles();
