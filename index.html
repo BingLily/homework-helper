@@ -268,7 +268,7 @@
             <div class="hw-header">
               <span class="subject-tag" :class="'subject-' + hw.subject">{{ subjectLabel(hw.subject) }}</span>
               <div class="hw-header-right">
-                <span v-if="getHomeworkCheckin(hw)" class="checkin-badge done">✅ {{ getHomeworkCheckin(hw).startTime }}-{{ getHomeworkCheckin(hw).endTime }} {{ formatDuration(getHomeworkCheckin(hw).duration) }}</span>
+                <span v-if="getHomeworkCheckin(hw)" class="checkin-badge done">✅ {{ timeRange(getHomeworkCheckin(hw)) }} · {{ formatDuration(getHomeworkCheckin(hw).duration) }}</span>
                 <span v-else class="checkin-badge pending">⏳ 点我打卡</span>
                 <button class="delete-btn" @click.stop="deleteHomework(hw.id)">🗑️</button>
               </div>
@@ -409,7 +409,7 @@
           </div>
           <div class="record-detail">
             <span>⏱ 用时 {{ formatDuration(r.duration) }}</span>
-            <span>{{ r.startTime }} - {{ r.endTime }}</span>
+            <span>{{ timeRange(r) }}</span>
           </div>
           <div v-if="r.homeworkIds && r.homeworkIds.length" style="margin-top:8px; font-size:13px; color: var(--text-light);">
             <div v-for="hid in r.homeworkIds" :key="hid" style="padding: 2px 0;">📋 {{ getHomeworkContent(hid) }}</div>
@@ -466,7 +466,7 @@
           </div>
           <div class="history-detail">
             <span>⏱ {{ formatDuration(r.duration) }}</span>
-            <span>{{ r.startTime }} - {{ r.endTime }}</span>
+            <span>{{ timeRange(r) }}</span>
           </div>
           <div class="record-attachments" v-if="r.attachments && r.attachments.length">
             <div class="record-img-list" v-if="r.images && r.images.length">
@@ -869,6 +869,15 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           return `${s}秒`;
         }
 
+        // 时间只精确到分钟，同一分钟内完成的打卡起止相同，此时只显示开始时间
+        function timeRange(r) {
+          const s = (r && r.startTime) || '';
+          const e = (r && r.endTime) || '';
+          if (!s) return e;
+          if (!e || e === s) return `${s} 起`;
+          return `${s} - ${e}`;
+        }
+
         function getHomeworkCheckin(hw) {
           const hwDate = new Date(hw.createdAt);
           const hwDay = `${hwDate.getFullYear()}-${String(hwDate.getMonth()+1).padStart(2,'0')}-${String(hwDate.getDate()).padStart(2,'0')}`;
@@ -1166,7 +1175,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
           users, currentUser, currentPage, filter, checkinSubject, showSwitchModal,
           checkinAttachments, checkinImagePreviews, checkinHomeworkIds,
           subjects, allSubjects,
-          selectUser, switchUser, go, subjectLabel, formatTime, formatDuration, getHomeworkCheckin, getHomeworkContent,
+          selectUser, switchUser, go, subjectLabel, formatTime, formatDuration, timeRange, getHomeworkCheckin, getHomeworkContent,
           userHomework, filteredHomework, homeworkByDate, addForm, todayStr, yesterdayStr, handleFiles, addHomework, deleteHomework, downloadAttachment,
           dateCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel, openCheckin,
           startTimer, pauseTimer, resumeTimer,
