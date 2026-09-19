@@ -562,7 +562,7 @@ CREATE POLICY "open" ON checkin FOR ALL USING (true) WITH CHECK (true);</code>
     <!-- NAV BAR -->
     <nav class="nav-bar" v-if="currentUser && currentPage !== 'checkin'">
       <button class="nav-item" :class="{ active: currentPage === 'homework' }" @click="go('homework')">
-        <span class="nav-icon">📚</span><span>作业</span>
+        <span class="nav-icon">📚</span><span>闯关</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'add' }" @click="go('add')">
         <span class="nav-icon">➕</span><span>添加</span>
