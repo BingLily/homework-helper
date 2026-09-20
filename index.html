@@ -170,6 +170,18 @@
     .history-header-right { display: flex; align-items: center; gap: 8px; }
     .history-detail { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-light); }
 
+    /* Weekly Points */
+    .weekly-points { padding: 16px; margin-bottom: 20px; }
+    .wp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .wp-week { font-size: 12px; color: var(--text-light); }
+    .wp-rule { font-size: 12px; color: var(--text-light); margin-bottom: 14px; }
+    .wp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .wp-item { text-align: center; background: #f7fbf7; border-radius: 12px; padding: 10px 4px; }
+    .wp-animal { font-size: 30px; line-height: 1.1; }
+    .wp-subject { font-size: 13px; font-weight: 700; margin-top: 4px; color: var(--text); }
+    .wp-points { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+    .wp-points b { color: var(--primary-dark); font-size: 13px; }
+
     /* User Switch Modal */
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; }
     .modal-content { background: white; border-radius: 20px; padding: 28px 24px; width: 85%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
@@ -464,6 +476,20 @@
         <div class="card stat-card">
           <div class="stat-value">{{ totalTimeStr }}</div>
           <div class="stat-label">总用时</div>
+        </div>
+      </div>
+      <div class="card weekly-points">
+        <div class="wp-header">
+          <h2 class="section-title" style="margin:0;">本周积分</h2>
+          <span class="wp-week">{{ weekRangeText }}</span>
+        </div>
+        <div class="wp-rule">用时不到 30 分钟完成打卡得 1 分，每周一自动清零</div>
+        <div class="wp-grid">
+          <div class="wp-item" v-for="s in subjects" :key="'wp'+s.key">
+            <div class="wp-animal">{{ animalFor(weeklyPoints[s.key]).icon }}</div>
+            <div class="wp-subject">{{ s.label }}</div>
+            <div class="wp-points"><b>{{ weeklyPoints[s.key] }}</b> 分<br>{{ animalFor(weeklyPoints[s.key]).name }}</div>
+          </div>
         </div>
       </div>
       <div class="subject-stats">
@@ -1488,6 +1514,45 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           return keys.map(k => ({ key: k, label: labels[k], count: counts[k], percent: (counts[k] / max) * 100 }));
         });
 
+        // Weekly points (reset every Monday)
+        const animalTiers = [
+          { min: 5, icon: '🐆', name: '猎豹' },
+          { min: 4, icon: '🐺', name: '狼' },
+          { min: 3, icon: '🐶', name: '狗' },
+          { min: 2, icon: '🐰', name: '兔子' },
+          { min: 1, icon: '🐌', name: '蜗牛' },
+          { min: 0, icon: '🥚', name: '加油' }
+        ];
+        function animalFor(points) {
+          const p = Math.max(0, Math.min(Number(points) || 0, 5));
+          return animalTiers.find(t => p >= t.min);
+        }
+        function pad2(n) { return String(n).padStart(2, '0'); }
+        function fmtYmd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+        function thisMonday() {
+          const now = new Date();
+          const day = now.getDay();
+          const diff = (day === 0 ? -6 : 1 - day);
+          return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+        }
+        const weekRangeText = computed(() => {
+          const mon = thisMonday();
+          const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+          return `${mon.getMonth() + 1}/${mon.getDate()} ~ ${sun.getMonth() + 1}/${sun.getDate()}`;
+        });
+        const weeklyPoints = computed(() => {
+          const start = fmtYmd(thisMonday());
+          const pts = {};
+          subjects.forEach(s => { pts[s.key] = 0; });
+          checkinRecords.forEach(r => {
+            if (r.user !== currentUser.value) return;
+            if (!r.date || r.date < start) return;
+            const d = Number(r.duration) || 0;
+            if (d > 0 && d < 1800 && pts[r.subject] !== undefined) pts[r.subject] += 1;
+          });
+          return pts;
+        });
+
         // Music schedule
         const musicFiles = ref([]);
         const planSlots = ref([]);
@@ -1717,7 +1782,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           dateCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel, openCheckin,
           startTimer, pauseTimer, resumeTimer,
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
-          history, totalDays, totalTimeStr, subjectStats,
+          history, totalDays, totalTimeStr, subjectStats, weeklyPoints, animalFor, weekRangeText,
           musicFiles, planSlots, planError, planWeekday, weekdaySlots, slotForm, musicEnabled, nowPlayingName, nextSlotText,
           weekdayLabel, slotResourceNames, slotMissing, handleMusicFiles, deleteMusicFile, testPlayMusic, stopMusic, toggleMusicEnabled,
           addSlot, deleteSlot, toggleSlotResourceId,
