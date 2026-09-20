@@ -492,17 +492,6 @@
           </div>
         </div>
       </div>
-      <div class="subject-stats">
-        <div class="card stat-item" v-for="s in subjectStats" :key="s.key">
-          <div class="stat-item-header">
-            <span class="subject-tag" :class="'subject-' + s.key">{{ s.label }}</span>
-            <span class="stat-count">{{ s.count }} 次</span>
-          </div>
-          <div class="stat-bar">
-            <div class="stat-bar-fill" :class="'bar-' + s.key" :style="{ width: s.percent + '%' }"></div>
-          </div>
-        </div>
-      </div>
       <h2 class="section-title">打卡详情</h2>
       <div v-if="history.length === 0" class="empty-state">
         <div class="emoji">📊</div>
@@ -707,7 +696,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
         <span class="nav-icon">➕</span><span>添加</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'history' }" @click="go('history')">
-        <span class="nav-icon">📊</span><span>记录</span>
+        <span class="nav-icon">📊</span><span>积分</span>
       </button>
       <button class="nav-item" :class="{ active: currentPage === 'music' }" @click="go('music')">
         <span class="nav-icon">🎵</span><span>熏听</span>
@@ -1505,15 +1494,6 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           return `${m}分钟`;
         });
 
-        const subjectStats = computed(() => {
-          const keys = ['chinese', 'math', 'english'];
-          const labels = { chinese: '语文', math: '数学', english: '英语' };
-          const counts = {};
-          keys.forEach(k => { counts[k] = history.value.filter(r => r.subject === k).length; });
-          const max = Math.max(...Object.values(counts), 1);
-          return keys.map(k => ({ key: k, label: labels[k], count: counts[k], percent: (counts[k] / max) * 100 }));
-        });
-
         // Weekly points (reset every Monday)
         const animalTiers = [
           { min: 5, icon: '🐆', name: '猎豹' },
@@ -1782,7 +1762,7 @@ CREATE POLICY "open" ON music_plan FOR ALL USING (true) WITH CHECK (true);</code
           dateCheckins, todaySubjectHomework, timerRunning, timerStarted, timerElapsed, checkinDate, hwDateLabel, openCheckin,
           startTimer, pauseTimer, resumeTimer,
           handleCheckinFiles, removeCheckinImage, finishCheckin, toggleHomeworkId, deleteCheckin,
-          history, totalDays, totalTimeStr, subjectStats, weeklyPoints, animalFor, weekRangeText,
+          history, totalDays, totalTimeStr, weeklyPoints, animalFor, weekRangeText,
           musicFiles, planSlots, planError, planWeekday, weekdaySlots, slotForm, musicEnabled, nowPlayingName, nextSlotText,
           weekdayLabel, slotResourceNames, slotMissing, handleMusicFiles, deleteMusicFile, testPlayMusic, stopMusic, toggleMusicEnabled,
           addSlot, deleteSlot, toggleSlotResourceId,
